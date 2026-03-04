@@ -1,42 +1,25 @@
-# sv
+# StabilityETH
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
 
-## Creating a project
+## Key Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **1:100 Minting Ratio** — SETH can be minted at a 1:100 ratio to native ETH on any supported chain.
 
-```sh
-# create a new project
-npx sv create my-app
-```
+- **Performance Based Returns (PBR)** — Verified applications generate yield proportionally to their relative TVL.
 
-To recreate this project with the same configuration:
+- **Omnichain Asset** — SETH maintains its 1:100 collateralization rate across all chains during cross-chain transfers.
 
-```sh
-# recreate this project
-pnpm dlx sv create --template minimal --types ts --add sveltekit-adapter="adapter:vercel" --install pnpm app
-```
+- **Open Eligibility** — All dApps are eligible for PBR if they meet the eligibility criteria.
 
-## Developing
+## How It Works
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+SETH is fully collateralized by ETH at a 100:1 ratio (1 SETH = 0.01 ETH). Cross-chain transfers preserve this collateralization regardless of message arrival order. Verified applications receive Performance Based Returns in proportion to their share of total TVL, which does not rely on SETH holdings and instead can include any token staked in any contract, as long as the token has a market cap above $100m and the contract has a TVL above $100k.
 
-```sh
-npm run dev
+## Registration
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and start earning Performance Based Returns (PBR). New EVM chains can be deployed automatically from the UI.
 
-## Building
+## Contact
 
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+The primary security contact for StabilityETH is security@islalabs.co.
