@@ -87,6 +87,9 @@ contract SETH is ERC20Permit, ReentrancyGuard {
         if (!success) revert EthTransferFailed();
     }
 
+    /// @notice Receive ETH collateral from bridge (adapter only). No mint.
+    function receiveCollateralFromBridge() external payable onlyAdapter { }
+
     // --------------------------------------------
     //  Fee Handling
     // --------------------------------------------
