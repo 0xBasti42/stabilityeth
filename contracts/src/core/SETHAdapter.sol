@@ -79,6 +79,7 @@ contract SETHAdapter is MintBurnOFTAdapter {
         MessagingFee calldata _fee,
         address _refundAddress
     ) internal virtual override returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt) {
+        // 1. Debit SETH amount
         (uint256 amountSentLD, uint256 amountReceivedLD) = _debit(
             msg.sender,
             _sendParam.amountLD,
@@ -86,6 +87,7 @@ contract SETHAdapter is MintBurnOFTAdapter {
             _sendParam.dstEid
         );
 
+        // 2. Release ETH from SETH, bridge via ethOft
         uint256 ethAmount = amountSentLD / ISETH(seth).EXCHANGE_RATE();
         ISETH(seth).releaseCollateralForBridge(amountSentLD);
 
@@ -101,6 +103,7 @@ contract SETHAdapter is MintBurnOFTAdapter {
         MessagingFee memory ethFee = IOFT(ethOft).quoteSend(ethParam, false);
         IOFT(ethOft).send{value: ethAmount + ethFee.nativeFee}(ethParam, ethFee, _refundAddress);
 
+        // 3. Send SETH OFT message (peer mints on destination)
         (bytes memory message, bytes memory options) = _buildMsgAndOptions(_sendParam, amountReceivedLD);
         MessagingFee memory sethFee = _quote(_sendParam.dstEid, message, options, false);
         msgReceipt = _lzSend(_sendParam.dstEid, message, options, sethFee, _refundAddress);
