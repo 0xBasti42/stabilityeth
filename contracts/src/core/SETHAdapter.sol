@@ -17,14 +17,16 @@ interface ISETH {
  */
 contract SETHAdapter is MintBurnOFTAdapter {
     address public seth;
-    address public ethOft;
 
     // --------------------------------------------
     //  Config
     // --------------------------------------------
+
+    /// @notice ETH OFT address on srcChain
+    address public ethOft;
     
-    // Spoke chain configs
-    mapping(uint32 => address) public sethAdapters;  // eid => adapter address
+    /// @notice SETHAdapter addresses on dstChains
+    mapping(uint32 => address) public sethAdapters;
 
     // --------------------------------------------
     //  Events & Errors
@@ -68,6 +70,7 @@ contract SETHAdapter is MintBurnOFTAdapter {
     //  Helper
     // --------------------------------------------
 
+    /// @notice Convert address to bytes32 for LayerZero data object
     function _addressToBytes32(address _addr) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(_addr)));
     }
