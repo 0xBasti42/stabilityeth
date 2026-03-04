@@ -86,7 +86,7 @@ contract SETH is ERC20Permit, ReentrancyGuard {
     }
 
     // --------------------------------------------
-    //  Cross-Chain
+    //  Cross-Chain Transfers
     // --------------------------------------------
 
     /**
