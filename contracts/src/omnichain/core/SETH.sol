@@ -8,8 +8,7 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
  * @notice Minted and burned at a 100:1 ratio with ETH
  */
 contract SETH is ERC20Permit {
-    ISETHAdapter public immutable sethAdapter;
-    IWETHAdapter public immutable wethAdapter;
+    address public immutable sethAdapter;
 
     uint256 public constant EXCHANGE_RATE = 100;
     uint256 public constant TRANSFER_FEE_BPS = 30;
@@ -74,7 +73,7 @@ contract SETH is ERC20Permit {
     }
 
     // --------------------------------------------
-    //  Mainnet Fee Handling
+    //  Fee Handling
     // --------------------------------------------
 
     /// @dev Override _update to apply fee on transfers (not mints/burns)
