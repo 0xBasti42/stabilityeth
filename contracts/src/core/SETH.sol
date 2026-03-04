@@ -2,12 +2,13 @@
 pragma solidity ^0.8.20;
 
 import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title SETH - StabilityETH
  * @notice Minted and burned at a 100:1 ratio with ETH
  */
-contract SETH is ERC20Permit {
+contract SETH is ERC20Permit, ReentrancyGuard {
     address public immutable sethAdapter;
 
     uint256 public constant EXCHANGE_RATE = 100;
@@ -21,9 +22,6 @@ contract SETH is ERC20Permit {
     // --------------------------------------------
 
     event FeesAccrued(address indexed from, uint256 amountAdded, uint256 totalOutstanding);
-    event FeeSwept(uint256 ethSwept, uint256 treasuryBalance);
-    event SpokeDeposit(uint256 ethAmount, uint256 sethMinted);
-    event SpokeWithdraw(uint256 sethBurned, uint256 ethReleased);
 
     error InvalidAddress();
     error Unauthorized();
@@ -34,18 +32,13 @@ contract SETH is ERC20Permit {
     // --------------------------------------------
 
     modifier onlyAdapter() {
-        if (msg.sender != address(adapter)) revert Unauthorized();
+        if (msg.sender != sethAdapter) revert Unauthorized();
         _;
     }
 
-    // --------------------------------------------
-    //  Initialization
-    // --------------------------------------------
-
-    constructor(address _pbrTreasury, address _adapter) ERC20("StabilityETH", "SETH") ERC20Permit("StabilityETH") {
-        if (_pbrTreasury == address(0) || _adapter == address(0)) revert InvalidAddress();
-        pbrTreasury = _pbrTreasury;
-        adapter = ISETHAdapter(_adapter);
+    constructor(address _adapter) ERC20("StabilityETH", "SETH") ERC20Permit("StabilityETH") {
+        if (_adapter == address(0)) revert InvalidAddress();
+        sethAdapter = _adapter;
     }
 
     // --------------------------------------------
@@ -67,8 +60,30 @@ contract SETH is ERC20Permit {
     /// @notice Burn SETH and withdraw ETH at 100:1 ratio
     function withdraw(uint256 sethAmount) external nonReentrant {
         _burn(msg.sender, sethAmount);
-
         (bool success, ) = msg.sender.call{value: sethAmount / EXCHANGE_RATE}("");
+        if (!success) revert EthTransferFailed();
+    }
+
+    // --------------------------------------------
+    //  Cross-Chain
+    // --------------------------------------------
+
+    /// @notice Burn from account (adapter only, for cross-chain debit)
+    function burn(address from, uint256 amount) external onlyAdapter returns (bool) {
+        _burn(from, amount);
+        return true;
+    }
+
+    /// @notice Mint to account (adapter only, for cross-chain credit)
+    function mint(address to, uint256 amount) external onlyAdapter returns (bool) {
+        _mint(to, amount);
+        return true;
+    }
+
+    /// @notice Release ETH collateral for bridge (adapter only). Sends ethAmount to caller.
+    function releaseCollateralForBridge(uint256 sethAmount) external onlyAdapter {
+        uint256 ethAmount = sethAmount / EXCHANGE_RATE;
+        (bool success, ) = msg.sender.call{value: ethAmount}("");
         if (!success) revert EthTransferFailed();
     }
 
