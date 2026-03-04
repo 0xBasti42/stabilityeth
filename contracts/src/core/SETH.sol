@@ -91,7 +91,7 @@ contract SETH is ERC20Permit, ReentrancyGuard {
 
     /**
     * @notice Burns SETH from account
-    * @dev Function restricted to SETHAdapter only for debiting cross-chain transfers
+    * @dev Function restricted to SETHAdapter only; debits msg.sender on srcChain
     */
     function burn(address from, uint256 amount) external onlyAdapter returns (bool) {
         _burn(from, amount);
@@ -99,17 +99,8 @@ contract SETH is ERC20Permit, ReentrancyGuard {
     }
 
     /**
-    * @notice Mints SETH to account
-    * @dev Function restricted to SETHAdapter only for crediting cross-chain transfers
-    */
-    function mint(address to, uint256 amount) external onlyAdapter returns (bool) {
-        _mint(to, amount);
-        return true;
-    }
-
-    /**
     * @notice Releases ETH collateral for cross-chain SETH transfers
-    * @dev Function restricted to SETHAdapter only; sends ethAmount to caller
+    * @dev Function restricted to SETHAdapter only; releases ethAmount from srcChain
     */
     function releaseCollateral(uint256 sethAmount) external onlyAdapter {
         uint256 ethAmount = sethAmount / EXCHANGE_RATE;
@@ -118,8 +109,17 @@ contract SETH is ERC20Permit, ReentrancyGuard {
     }
 
     /**
+    * @notice Mints SETH to account
+    * @dev Function restricted to SETHAdapter only; credits msg.sender on dstChain
+    */
+    function mint(address to, uint256 amount) external onlyAdapter returns (bool) {
+        _mint(to, amount);
+        return true;
+    }
+
+    /**
     * @notice Receives ETH collateral from cross-chain SETH transfers
-    * @dev Function restricted to SETHAdapter only; receives ETH amount without minting SETH equivalent
+    * @dev Function restricted to SETHAdapter only; receives ethAmount on dstChain without minting SETH equivalent
     */
     function receiveCollateral() external payable onlyAdapter { }
 
