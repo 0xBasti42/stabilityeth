@@ -5,16 +5,27 @@ import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
- * @title SETH - StabilityETH
- * @notice Minted and burned at a 100:1 ratio with ETH
+ * @title SETH | StabilityETH
+ * @notice Omnichain SETH is minted and burned at a 100:1 ratio with ETH; provides Performance Based Returns (PBR) to verified applications
+ * @dev Turns TVL into an additional source of revenue for verified applications | https://stability-eth.io/registry/
  */
 contract SETH is ERC20Permit, ReentrancyGuard {
     address public immutable sethAdapter;
 
+    // --------------------------------------------
+    //  Configuration
+    // --------------------------------------------
+
+    /// @notice Maintains 1:100 collateralization between ETH and SETH
     uint256 public constant EXCHANGE_RATE = 100;
+
+    /// @notice 0.3% fee-on-transfer which gets circulated to verified applications as Performance Based Returns (PBR)
     uint256 public constant TRANSFER_FEE_BPS = 30;
+
+    /// @notice Standardized basis points denominator
     uint256 private constant BPS_DENOMINATOR = 10000;
 
+    /// @notice Ringfenced account keeping for fee-on-transfer; collected lazily during PBR distribution
     uint256 public accruedFees;
 
     // --------------------------------------------
@@ -36,6 +47,10 @@ contract SETH is ERC20Permit, ReentrancyGuard {
         _;
     }
 
+    // --------------------------------------------
+    //  Initialization
+    // --------------------------------------------
+
     constructor(address _adapter) ERC20("StabilityETH", "SETH") ERC20Permit("StabilityETH") {
         if (_adapter == address(0)) revert InvalidAddress();
         sethAdapter = _adapter;
@@ -45,19 +60,25 @@ contract SETH is ERC20Permit, ReentrancyGuard {
     //  Collateral Exchange
     // --------------------------------------------
 
-    /// @notice Relay ETH deposits
+    /**
+    * @notice Relays ETH deposits to deposit()
+    */
     receive() external payable {
         deposit();
     }
 
-    /// @notice Mint SETH at 100:1 ratio to ETH deposits
+    /**
+    * @notice Mints SETH at 100:1 ratio to ETH deposits
+    */
     function deposit() public payable {
         uint256 sethAmount = msg.value * EXCHANGE_RATE;
 
         _mint(msg.sender, sethAmount);
     }
 
-    /// @notice Burn SETH and withdraw ETH at 100:1 ratio
+    /**
+    * @notice Burns SETH and withdraws ETH at 100:1 ratio
+    */
     function withdraw(uint256 sethAmount) external nonReentrant {
         _burn(msg.sender, sethAmount);
         (bool success, ) = msg.sender.call{value: sethAmount / EXCHANGE_RATE}("");
@@ -68,33 +89,48 @@ contract SETH is ERC20Permit, ReentrancyGuard {
     //  Cross-Chain
     // --------------------------------------------
 
-    /// @notice Burn from account (adapter only, for cross-chain debit)
+    /**
+    * @notice Burns SETH from account
+    * @dev Function restricted to SETHAdapter only for debiting cross-chain transfers
+    */
     function burn(address from, uint256 amount) external onlyAdapter returns (bool) {
         _burn(from, amount);
         return true;
     }
 
-    /// @notice Mint to account (adapter only, for cross-chain credit)
+    /**
+    * @notice Mints SETH to account
+    * @dev Function restricted to SETHAdapter only for crediting cross-chain transfers
+    */
     function mint(address to, uint256 amount) external onlyAdapter returns (bool) {
         _mint(to, amount);
         return true;
     }
 
-    /// @notice Release ETH collateral for bridge (adapter only). Sends ethAmount to caller.
+    /**
+    * @notice Releases ETH collateral for cross-chain SETH transfers
+    * @dev Function restricted to SETHAdapter only; sends ethAmount to caller
+    */
     function releaseCollateral(uint256 sethAmount) external onlyAdapter {
         uint256 ethAmount = sethAmount / EXCHANGE_RATE;
         (bool success, ) = msg.sender.call{value: ethAmount}("");
         if (!success) revert EthTransferFailed();
     }
 
-    /// @notice Receive ETH collateral from bridge (adapter only). No mint.
+    /**
+    * @notice Receives ETH collateral from cross-chain SETH transfers
+    * @dev Function restricted to SETHAdapter only; receives ETH amount without minting SETH equivalent
+    */
     function receiveCollateral() external payable onlyAdapter { }
 
     // --------------------------------------------
     //  Fee Handling
     // --------------------------------------------
 
-    /// @dev Override _update to apply fee on transfers (not mints/burns)
+    /**
+    * @notice Overrides _update to apply PBR fee on transfers
+    * @dev Fee not applied to mints/burns, which covers deposit(), withdraw(), and cross-chain transfers
+    */
     function _update(address from, address to, uint256 value) internal virtual override {
         // Mint or burn: no fee
         if (from == address(0) || to == address(0)) {

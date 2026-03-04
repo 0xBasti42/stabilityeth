@@ -19,7 +19,7 @@ contract SETHAdapter is MintBurnOFTAdapter {
     address public seth;
 
     // --------------------------------------------
-    //  Config
+    //  Configuration
     // --------------------------------------------
 
     /// @notice ETH OFT address on srcChain
@@ -61,11 +61,9 @@ contract SETHAdapter is MintBurnOFTAdapter {
     //  Upkeep
     // --------------------------------------------
 
-    /**
-    * @notice Add a new SETHAdapter address for a destination chain
-    * @dev Each dstChain SETHAdapter relays ETH collateral from the other side of cross-chain transfers
-    * to maintain 1:100 collateralization on the chain's SETH contract.
-    */
+    /// @notice Add a new SETHAdapter address for a destination chain
+    /// @dev Each dstChain SETHAdapter relays ETH collateral from the other side of cross-chain transfers
+    /// to maintain 1:100 collateralization on the chain's SETH contract.
     function addSethAdapter(uint32 _eid, address _adapter) external onlyOwner {
         sethAdapters[_eid] = _adapter;
     }
