@@ -80,38 +80,6 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         // ETH stays in adapter; lzCompose will record ethQueue[transferId]
     }
 
-    /// @notice Receive compose from ethOft; record transferId -> amount, process pending mint if any
-    function lzCompose(
-        address _from,
-        bytes32 /* _guid */,
-        bytes calldata _message,
-        address /* _executor */,
-        bytes calldata /* _extraData */
-    ) external payable override {
-        if (msg.sender != address(endpoint)) revert InvalidComposeSender();
-        if (_from != ethOft) revert InvalidComposeSender();
-
-        uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
-        bytes memory rawCompose = OFTComposeMsgCodec.composeMsg(_message);
-        uint256 transferId;
-        assembly {
-            transferId := mload(add(add(rawCompose, 32), 32))
-        }
-        ethQueue[transferId] = amountLD;
-        _processPendingMint(transferId);
-    }
-
-    function _processPendingMint(uint256 _transferId) internal {
-        PendingMint memory pm = pendingMints[_transferId];
-        if (pm.to == address(0)) return;
-        uint256 ethAmount = ethQueue[_transferId];
-        if (ethAmount == 0) return;
-        delete ethQueue[_transferId];
-        delete pendingMints[_transferId];
-        ISETH(seth).receiveCollateral{value: ethAmount}();
-        minterBurner.mint(pm.to, pm.amountLD);
-    }
-
     // --------------------------------------------
     //  Upkeep
     // --------------------------------------------
@@ -132,55 +100,14 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         return bytes32(uint256(uint160(_addr)));
     }
 
-    /// @notice Override: extract transferId from composeMsg, only mint when ETH has arrived
-    function _lzReceive(
-        Origin calldata _origin,
-        bytes32 _guid,
-        bytes calldata _message,
-        address /* _executor */,
-        bytes calldata /* _extraData */
-    ) internal virtual override {
-        if (!OFTMsgCodec.isComposed(_message)) revert InvalidComposeSender();
-        address toAddress = OFTMsgCodec.bytes32ToAddress(OFTMsgCodec.sendTo(_message));
-        uint256 amountReceivedLD = _toLD(OFTMsgCodec.amountSD(_message));
-        bytes memory rawCompose = OFTMsgCodec.composeMsg(_message);
-        uint256 transferId;
-        assembly {
-            transferId := mload(add(add(rawCompose, 32), 32))
-        }
-        _creditTransferId = transferId;
-        _credit(toAddress, amountReceivedLD, _origin.srcEid);
-        _creditTransferId = 0;
-        emit OFTReceived(_guid, _origin.srcEid, toAddress, amountReceivedLD);
-    }
-
-    /// @notice Override: match by transferId; mint only when ethQueue has ETH for this transfer
-    function _credit(
-        address _to,
-        uint256 _amountLD,
-        uint32 /* _srcEid */
-    ) internal virtual override returns (uint256) {
-        if (_to == address(0)) _to = address(0xdead);
-        uint256 transferId = _creditTransferId;
-        uint256 ethAmount = _amountLD / ISETH(seth).EXCHANGE_RATE();
-        if (ethQueue[transferId] > 0) {
-            delete ethQueue[transferId];
-            ISETH(seth).receiveCollateral{value: ethAmount}();
-            minterBurner.mint(_to, _amountLD);
-        } else {
-            pendingMints[transferId] = PendingMint({ to: _to, amountLD: _amountLD });
-        }
-        return _amountLD;
-    }
-
     // --------------------------------------------
     //  Quote Fee
     // --------------------------------------------
 
     /**
-    * @notice Returns combined LayerZero fee (SETH message + ETH collateral bridge)
-    * @dev Read only. Actual fee is deducted automatically from _send since ETH collateral is being moved by default.
-    */
+     * @notice Returns combined LayerZero fee (SETH message + ETH collateral bridge)
+     * @dev Read only. Actual fee is deducted automatically from _send since ETH collateral is being moved by default.
+     */
     function quoteSend(SendParam calldata _sendParam, bool _payInLzToken) external view override returns (MessagingFee memory) {
         address dstAdapter = sethAdapters[_sendParam.dstEid];
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
@@ -217,12 +144,12 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     // --------------------------------------------
 
     /**
-    * @notice Executes collateralized cross-chain SETH transfer. Fees deducted from SETH (no ETH required).
-    * @dev MessagingFee is required as part of the IOFT interface, but the actual value is computed inside the _send function
-    * because cross-chain SETH transfers also move underlying ETH collateral. LayerZero fees are deducted automatically from
-    * the collateral balance. As a result, you can pass any value through as MessagingFee, such as MessagingFee(0, 0), or use
-    * the quote provided by quoteSend.
-    */
+     * @notice Executes collateralized cross-chain SETH transfer. Fees deducted from SETH (no ETH required).
+     * @dev MessagingFee is required as part of the IOFT interface, but the actual value is computed inside the _send function
+     * because cross-chain SETH transfers also move underlying ETH collateral. LayerZero fees are deducted automatically from
+     * the collateral balance. As a result, you can pass any value through as MessagingFee, such as MessagingFee(0, 0), or use
+     * the quote provided by quoteSend.
+     */
     function send(
         SendParam calldata _sendParam,
         MessagingFee calldata _fee,
@@ -307,5 +234,97 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         msgReceipt = _lzSend(_sendParam.dstEid, message, options, sethFee, _refundAddress);
         oftReceipt = OFTReceipt(amountSentLD, amountReceivedLD);
         emit OFTSent(msgReceipt.guid, _sendParam.dstEid, msg.sender, amountSentLD, amountReceivedLD);
+    }
+
+    // --------------------------------------------
+    //  Receive Cross-Chain ETH Collateral
+    // --------------------------------------------
+
+    /**
+     * @notice Receives composeMsg from ethOft
+     * @dev Records ethQueue[transferId] = amountLD; processes pending mint if SETH message arrived first.
+     */
+    function lzCompose(
+        address _from,
+        bytes32 /* _guid */,
+        bytes calldata _message,
+        address /* _executor */,
+        bytes calldata /* _extraData */
+    ) external payable override {
+        if (msg.sender != address(endpoint)) revert InvalidComposeSender();
+        if (_from != ethOft) revert InvalidComposeSender();
+
+        uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
+        bytes memory rawCompose = OFTComposeMsgCodec.composeMsg(_message);
+        uint256 transferId;
+        assembly {
+            transferId := mload(add(add(rawCompose, 32), 32))
+        }
+        ethQueue[transferId] = amountLD;
+        _processPendingMint(transferId);
+    }
+
+    /**
+     * @notice Relays collateral and processes SETH mint if SETH message has already arrived
+     */
+    function _processPendingMint(uint256 _transferId) internal {
+        PendingMint memory pm = pendingMints[_transferId];
+        if (pm.to == address(0)) return;
+        uint256 ethAmount = ethQueue[_transferId];
+        if (ethAmount == 0) return;
+        delete ethQueue[_transferId];
+        delete pendingMints[_transferId];
+        ISETH(seth).receiveCollateral{value: ethAmount}();
+        minterBurner.mint(pm.to, pm.amountLD);
+    }
+
+    // --------------------------------------------
+    //  Receive Cross-Chain SETH
+    // --------------------------------------------
+
+    /**
+     * @notice Override: extracts transferId from composeMsg
+     * @dev Reads ethQueue[transferId] if ETH arrived first and mints; otherwise records pendingMints[transferId] for later.
+     */
+    function _lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address /* _executor */,
+        bytes calldata /* _extraData */
+    ) internal virtual override {
+        if (!OFTMsgCodec.isComposed(_message)) revert InvalidComposeSender();
+        address toAddress = OFTMsgCodec.bytes32ToAddress(OFTMsgCodec.sendTo(_message));
+        uint256 amountReceivedLD = _toLD(OFTMsgCodec.amountSD(_message));
+        bytes memory rawCompose = OFTMsgCodec.composeMsg(_message);
+        uint256 transferId;
+        assembly {
+            transferId := mload(add(add(rawCompose, 32), 32))
+        }
+        _creditTransferId = transferId;
+        _credit(toAddress, amountReceivedLD, _origin.srcEid);
+        _creditTransferId = 0;
+        emit OFTReceived(_guid, _origin.srcEid, toAddress, amountReceivedLD);
+    }
+
+    /**
+     * @notice Processes SETH mint and relays collateral if ethAmount has already arrived
+     */
+    function _credit(
+        address _to,
+        uint256 _amountLD,
+        uint32 /* _srcEid */
+    ) internal virtual override returns (uint256) {
+        if (_to == address(0)) _to = address(0xdead);
+        uint256 transferId = _creditTransferId;
+        uint256 ethAmount = _amountLD / ISETH(seth).EXCHANGE_RATE();
+        if (ethQueue[transferId] > 0) {
+            delete ethQueue[transferId];
+            ISETH(seth).receiveCollateral{value: ethAmount}();
+            minterBurner.mint(_to, _amountLD);
+        } else {
+            pendingMints[transferId] = PendingMint({ to: _to, amountLD: _amountLD });
+        }
+        return _amountLD;
     }
 }
