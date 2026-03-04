@@ -81,14 +81,14 @@ contract SETH is ERC20Permit, ReentrancyGuard {
     }
 
     /// @notice Release ETH collateral for bridge (adapter only). Sends ethAmount to caller.
-    function releaseCollateralForBridge(uint256 sethAmount) external onlyAdapter {
+    function releaseCollateral(uint256 sethAmount) external onlyAdapter {
         uint256 ethAmount = sethAmount / EXCHANGE_RATE;
         (bool success, ) = msg.sender.call{value: ethAmount}("");
         if (!success) revert EthTransferFailed();
     }
 
     /// @notice Receive ETH collateral from bridge (adapter only). No mint.
-    function receiveCollateralFromBridge() external payable onlyAdapter { }
+    function receiveCollateral() external payable onlyAdapter { }
 
     // --------------------------------------------
     //  Fee Handling

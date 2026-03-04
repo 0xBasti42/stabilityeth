@@ -7,8 +7,8 @@ import { IMintableBurnable } from "@layerzerolabs/oft-evm/contracts/interfaces/I
 
 interface ISETH {
     function EXCHANGE_RATE() external view returns (uint256);
-    function releaseCollateralForBridge(uint256 sethAmount) external;
-    function receiveCollateralFromBridge() external payable;
+    function releaseCollateral(uint256 sethAmount) external;
+    function receiveCollateral() external payable;
 }
 
 /**
@@ -54,14 +54,18 @@ contract SETHAdapter is MintBurnOFTAdapter {
     /// @notice Receive ETH from ethOft, forward to SETH as collateral
     receive() external payable {
         if (msg.sender != ethOft) revert DirectDepositsDisabled();
-        ISETH(seth).receiveCollateralFromBridge{value: msg.value}();
+        ISETH(seth).receiveCollateral{value: msg.value}();
     }
 
     // --------------------------------------------
     //  Upkeep
     // --------------------------------------------
 
-    /// @notice Set SETHAdapter address for a destination chain (ETH collateral recipient)
+    /**
+    * @notice Add a new SETHAdapter address for a destination chain
+    * @dev Each dstChain SETHAdapter relays ETH collateral from the other side of cross-chain transfers
+    * to maintain 1:100 collateralization on the chain's SETH contract.
+    */
     function addSethAdapter(uint32 _eid, address _adapter) external onlyOwner {
         sethAdapters[_eid] = _adapter;
     }
@@ -76,10 +80,13 @@ contract SETHAdapter is MintBurnOFTAdapter {
     }
 
     // --------------------------------------------
-    //  Quote Cross-Chain
+    //  Quote Fee
     // --------------------------------------------
 
-    /// @notice Returns combined LayerZero fee (SETH message + ETH collateral bridge)
+    /**
+    * @notice Returns combined LayerZero fee (SETH message + ETH collateral bridge)
+    * @dev Read only. Actual fee is deducted automatically from _send since ETH collateral is being moved by default.
+    */
     function quoteSend(SendParam calldata _sendParam, bool _payInLzToken) external view override returns (MessagingFee memory) {
         address dstAdapter = sethAdapters[_sendParam.dstEid];
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
@@ -101,24 +108,17 @@ contract SETHAdapter is MintBurnOFTAdapter {
         return MessagingFee({ nativeFee: sethFee.nativeFee + ethFee.nativeFee, lzTokenFee: sethFee.lzTokenFee + ethFee.lzTokenFee });
     }
 
-    /// @notice Returns LayerZero fee in SETH terms (deducted from send amount)
-    function quoteSendFeeInSeth(SendParam calldata _sendParam) external view returns (uint256 feeSethAmount) {
-        MessagingFee memory fee = this.quoteSend(_sendParam, false);
-        return fee.nativeFee * ISETH(seth).EXCHANGE_RATE();
-    }
-
-    /// @notice Returns amount received on destination (amount sent minus fee)
-    function quoteAmountReceived(SendParam calldata _sendParam) external view returns (uint256 amountReceivedLD) {
-        uint256 amountSentLD = _removeDust(_sendParam.amountLD);
-        uint256 feeSethAmount = this.quoteSendFeeInSeth(_sendParam);
-        return amountSentLD - feeSethAmount;
-    }
-
     // --------------------------------------------
     //  Send Cross-Chain
     // --------------------------------------------
 
-    /// @notice Executes collateralized cross-chain SETH transfer. Fees deducted from SETH (no ETH required).
+    /**
+    * @notice Executes collateralized cross-chain SETH transfer. Fees deducted from SETH (no ETH required).
+    * @dev MessagingFee is required as part of the IOFT interface, but the actual value is computed inside the _send function
+    * because cross-chain SETH transfers also move underlying ETH collateral. LayerZero fees are deducted automatically from
+    * the collateral balance. As a result, you can pass any value through as MessagingFee, such as MessagingFee(0, 0), or use
+    * the quote provided by quoteSend.
+    */
     function send(
         SendParam calldata _sendParam,
         MessagingFee calldata _fee,
@@ -173,7 +173,7 @@ contract SETHAdapter is MintBurnOFTAdapter {
         minterBurner.burn(msg.sender, amountSentLD);
 
         // 2. Release ETH from SETH, bridge via ethOft
-        ISETH(seth).releaseCollateralForBridge(amountSentLD);
+        ISETH(seth).releaseCollateral(amountSentLD);
         IOFT(ethOft).send{value: ethAmount + ethFee.nativeFee}(ethParam, ethFee, _refundAddress);
 
         // 3. Send SETH OFT message (peer mints amountReceivedLD on destination)
