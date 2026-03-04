@@ -18,7 +18,7 @@ SETH is backed 1:1 by ETH at the 100:1 ratio (1 ETH → 100 SETH). Cross-chain t
 
 ## Registration
 
-Visit https://stability-eth.io/registry/ to verify a dApp and start earning Performance Based Returns (PBR). New EVM chains can be deployed automatically from the UI.
+Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and start earning Performance Based Returns (PBR). New EVM chains can be deployed automatically from the UI.
 
 ## Contact
 
