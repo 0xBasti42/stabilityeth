@@ -14,7 +14,8 @@ StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a ke
 
 ## How It Works
 
-SETH is fully collateralized by ETH at a 100:1 ratio (1 ETH → 100 SETH). Cross-chain transfers preserve this collateralization regardless of message arrival order. Verified applications receive Performance Based Returns in proportion to their share of total SETH TVL.
+SETH is fully collateralized by ETH at a 100:1 ratio (1 ETH → 100 SETH). Cross-chain transfers preserve this collateralization regardless of message arrival order. Verified applications receive Performance Based Returns in proportion to their share of total TVL, which does not rely on SETH holdings and instead can include any
+token that has a market cap above $100m.
 
 ## Registration
 
