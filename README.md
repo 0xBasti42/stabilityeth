@@ -6,11 +6,11 @@ StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a ke
 
 - **1:100 Minting Ratio** — SETH can be minted at a 1:100 ratio to native ETH on any supported chain.
 
-- **Performance Based Returns (PBR)** — Verified applications earn returns proportionally to their relative TVL across deployed contracts.
+- **Performance Based Returns (PBR)** — Verified applications generate yield proportionally to their relative TVL, which is verified automatically during registration.
 
 - **Omnichain Asset** — SETH maintains its 1:100 collateralization rate across all chains during cross-chain transfers.
 
-- **Open Eligibility** — All dApps are eligible for PBR if they meet the simple eligibility criteria.
+- **Open Eligibility** — All dApps are eligible for PBR if they meet the eligibility criteria.
 
 ## How It Works
 
