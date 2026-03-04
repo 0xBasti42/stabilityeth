@@ -1,66 +1,25 @@
-## Foundry
+# StabilityETH
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
 
-Foundry consists of:
+## Key Features
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- **1:100 Minting Ratio** — SETH can be minted at a 1:100 ratio to native ETH on any supported chain.
 
-## Documentation
+- **Performance Based Returns (PBR)** — Verified applications generate yield proportionally to their relative TVL.
 
-https://book.getfoundry.sh/
+- **Omnichain Asset** — SETH maintains its 1:100 collateralization rate across all chains during cross-chain transfers.
 
-## Usage
+- **Open Eligibility** — All dApps are eligible for PBR if they meet the eligibility criteria.
 
-### Build
+## How It Works
 
-```shell
-$ forge build
-```
+SETH is backed 1:1 by ETH at the 100:1 ratio (1 ETH → 100 SETH). Cross-chain transfers preserve this collateralization regardless of message arrival order. Verified applications receive Performance Based Returns in proportion to their share of total SETH TVL.
 
-### Test
+## Registration
 
-```shell
-$ forge test
-```
+Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and start earning Performance Based Returns (PBR). New EVM chains can be deployed automatically from the UI.
 
-### Format
+## Contact
 
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+The primary security contact for StabilityETH is security@islalabs.co.
