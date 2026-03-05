@@ -58,9 +58,15 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     //  Events & Errors
     // --------------------------------------------
 
+    event NewChainAdded(uint32 indexed eid, address adapter);
+
     error InvalidAddress();
+    error InvalidEid();
+    error InvalidRecipient();
+    error InvalidAmount();
     error DirectDepositsDisabled();
     error SethAdapterNotSet(uint32 eid);
+    error AdapterAlreadySet(uint32 eid);
     error InvalidComposeSender();
 
     // --------------------------------------------
@@ -92,7 +98,12 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     /// @dev Each dstChain SETHAdapter relays ETH collateral from the other side of cross-chain transfers
     /// to maintain 1:100 collateralization on the chain's SETH contract.
     function addSethAdapter(uint32 _eid, address _adapter) external onlyOwner {
+        if (_eid == 0) revert InvalidEid();
+        if (_adapter == address(0)) revert InvalidAddress();
+        if (sethAdapters[_eid] != address(0)) revert AdapterAlreadySet(_eid);
+
         sethAdapters[_eid] = _adapter;
+        emit NewChainAdded(_eid, _adapter);
     }
 
     // --------------------------------------------
@@ -104,6 +115,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
      * @dev Read only. Actual fee is deducted automatically from _send since ETH collateral is being moved by default.
      */
     function quoteSend(SendParam calldata _sendParam, bool _payInLzToken) external view override returns (MessagingFee memory) {
+        if (_sendParam.to == bytes32(0)) revert InvalidRecipient();
         address dstAdapter = sethAdapters[_sendParam.dstEid];
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
 
@@ -140,10 +152,13 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         MessagingFee calldata /* _fee */,
         address _refundAddress
     ) internal virtual override returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt) {
+        if (_sendParam.to == bytes32(0)) revert InvalidRecipient();
+
         address dstAdapter = sethAdapters[_sendParam.dstEid];
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
 
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
+        if (amountSentLD == 0) revert InvalidAmount();
         uint256 transferId = ++transferIdCounter;
         bytes memory transferIdPayload = abi.encode(transferId);
 
@@ -345,8 +360,6 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         uint256 _amountLD,
         uint32 /* _srcEid */
     ) internal virtual override returns (uint256) {
-        if (_to == address(0)) _to = address(0xdead);
-
         uint256 transferId = _creditTransferId;
         uint32 srcEid = _creditSrcEid;
         uint256 ethAmount = _amountLD / ISETH(SETH).EXCHANGE_RATE();
