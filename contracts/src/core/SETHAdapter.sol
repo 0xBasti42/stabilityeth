@@ -21,6 +21,8 @@ interface ISETH {
  * @title SETHAdapter | StabilityETH
  * @notice LayerZero OFT wrapper for SETH which handles cross-chain collateral flows.
  * @dev Uses transferId in composeMsg to match ETH and SETH messages; only mints when ETH has arrived.
+ * @author Isla Labs (Tom Jarvis | 0xBasti42)
+ * @custom:security-contact security@islalabs.co
  */
 contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     address public seth;

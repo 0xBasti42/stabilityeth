@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
  * @notice Admin relay owned by Multisig; wraps privileged actions and predefines possible updates
  * @dev Orchestrator is granted relevant admin roles for SETHAdapter, AppRegistry and PBRManager to 
  * maintain local storage properties and perform key maintenance actions.
+ * @author Isla Labs (Tom Jarvis | 0xBasti42)
+ * @custom:security-contact security@islalabs.co
  */
 contract Orchestrator {
 	address public multisig;

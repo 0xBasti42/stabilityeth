@@ -9,6 +9,8 @@ import { ReentrancyGuard } from "@openzeppelin-v5/contracts/utils/ReentrancyGuar
  * @title SETH | StabilityETH
  * @notice Omnichain SETH is minted and burned at a 100:1 ratio with ETH; provides Performance Based Returns (PBR) to verified applications
  * @dev Turns TVL into an additional source of revenue for verified applications | https://stability-eth.io/registry/
+ * @author Isla Labs (Tom Jarvis | 0xBasti42)
+ * @custom:security-contact security@islalabs.co
  */
 contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
     address public immutable sethAdapter;
