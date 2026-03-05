@@ -93,30 +93,6 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     }
 
     // --------------------------------------------
-    //  Helper
-    // --------------------------------------------
-
-    /// @notice Convert address to bytes32 for LayerZero data object
-    function _addressToBytes32(address _addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(_addr)));
-    }
-
-    /// @notice Build message and options from memory SendParam (parent's _buildMsgAndOptions requires calldata)
-    /// @param _extraOptions Must be calldata for combineOptions; pass from original _sendParam when available
-    function _buildMsgAndOptionsMemory(
-        SendParam memory _sendParam,
-        uint256 _amountLD,
-        bytes calldata _extraOptions
-    ) internal view returns (bytes memory message, bytes memory options) {
-        bool hasCompose;
-        (message, hasCompose) = OFTMsgCodec.encode(_sendParam.to, _toSD(_amountLD), _sendParam.composeMsg);
-        uint16 msgType = hasCompose ? SEND_AND_CALL : SEND;
-        options = combineOptions(_sendParam.dstEid, msgType, _extraOptions);
-        address inspector = msgInspector;
-        if (inspector != address(0)) IOAppMsgInspector(inspector).inspect(message, options);
-    }
-
-    // --------------------------------------------
     //  Quote Fee
     // --------------------------------------------
 
@@ -142,7 +118,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     // --------------------------------------------
 
     /**
-     * @notice Executes collateralized cross-chain SETH transfer. Fees deducted from SETH (no ETH required).
+     * @notice Executes collateralized cross-chain SETH transfer. Fees deducted from underlying ETH collateral (not msg.value).
      * @dev MessagingFee is required as part of the IOFT interface, but the actual value is computed inside the _send function
      * because cross-chain SETH transfers also move underlying ETH collateral. LayerZero fees are deducted automatically from
      * the collateral balance. As a result, you can pass any value through as MessagingFee, such as MessagingFee(0, 0), or use
@@ -179,26 +155,10 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         ISETH(seth).releaseCollateral(amountSentLD);
 
         uint256 ethAmount = amountReceivedLD / ISETH(seth).EXCHANGE_RATE();
-        SendParam memory ethParam = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _addressToBytes32(dstAdapter),
-            amountLD: ethAmount,
-            minAmountLD: ethAmount,
-            extraOptions: "",
-            composeMsg: transferIdPayload,
-            oftCmd: ""
-        });
+        SendParam memory ethParam = _buildEthSendParam(_sendParam, dstAdapter, ethAmount, transferIdPayload);
         IOFT(ethOft).send{value: ethAmount + ethFee.nativeFee}(ethParam, ethFee, _refundAddress);
 
-        SendParam memory sethParam = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _sendParam.to,
-            amountLD: amountReceivedLD,
-            minAmountLD: _sendParam.minAmountLD,
-            extraOptions: _sendParam.extraOptions,
-            composeMsg: transferIdPayload,
-            oftCmd: _sendParam.oftCmd
-        });
+        SendParam memory sethParam = _buildSethSendParam(_sendParam, amountReceivedLD, transferIdPayload);
         (bytes memory message, bytes memory options) = _buildMsgAndOptionsMemory(sethParam, amountReceivedLD, _sendParam.extraOptions);
         MessagingFee memory sethFee = _quote(_sendParam.dstEid, message, options, false);
 
@@ -207,6 +167,10 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
         emit OFTSent(msgReceipt.guid, _sendParam.dstEid, msg.sender, amountSentLD, amountReceivedLD);
     }
+
+    // --------------------------------------------
+    //  Internal
+    // --------------------------------------------
 
     /**
      * @notice Quotes ETH and SETH LayerZero fees, computes amountReceivedLD after fee deduction
@@ -220,26 +184,10 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         bool _payInLzToken
     ) internal view returns (MessagingFee memory ethFee, MessagingFee memory sethFee, uint256 amountReceivedLD) {
         uint256 ethAmountForQuote = amountSentLD / ISETH(seth).EXCHANGE_RATE();
-        SendParam memory ethParamForQuote = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _addressToBytes32(dstAdapter),
-            amountLD: ethAmountForQuote,
-            minAmountLD: ethAmountForQuote,
-            extraOptions: "",
-            composeMsg: composeMsg,
-            oftCmd: ""
-        });
+        SendParam memory ethParamForQuote = _buildEthSendParam(_sendParam, dstAdapter, ethAmountForQuote, composeMsg);
         ethFee = IOFT(ethOft).quoteSend(ethParamForQuote, false);
 
-        SendParam memory sethParamApprox = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _sendParam.to,
-            amountLD: amountSentLD,
-            minAmountLD: _sendParam.minAmountLD,
-            extraOptions: _sendParam.extraOptions,
-            composeMsg: composeMsg,
-            oftCmd: _sendParam.oftCmd
-        });
+        SendParam memory sethParamApprox = _buildSethSendParam(_sendParam, amountSentLD, composeMsg);
         (bytes memory messageApprox, bytes memory optionsApprox) =
             _buildMsgAndOptionsMemory(sethParamApprox, amountSentLD, _sendParam.extraOptions);
         sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, _payInLzToken);
@@ -247,6 +195,41 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         uint256 totalFees = sethFee.nativeFee + ethFee.nativeFee;
         uint256 feeSethAmount = totalFees * ISETH(seth).EXCHANGE_RATE();
         amountReceivedLD = amountSentLD - feeSethAmount;
+    }
+
+    /// @notice Build SendParam for ETH OFT (collateral bridge to dstAdapter)
+    function _buildEthSendParam(
+        SendParam calldata _sendParam,
+        address dstAdapter,
+        uint256 ethAmount,
+        bytes memory composeMsg
+    ) internal pure returns (SendParam memory) {
+        return SendParam({
+            dstEid: _sendParam.dstEid,
+            to: _addressToBytes32(dstAdapter),
+            amountLD: ethAmount,
+            minAmountLD: ethAmount,
+            extraOptions: "",
+            composeMsg: composeMsg,
+            oftCmd: ""
+        });
+    }
+
+    /// @notice Build SendParam for SETH message (user-facing OFT params with variable amount/composeMsg)
+    function _buildSethSendParam(
+        SendParam calldata _sendParam,
+        uint256 amountLD,
+        bytes memory composeMsg
+    ) internal pure returns (SendParam memory) {
+        return SendParam({
+            dstEid: _sendParam.dstEid,
+            to: _sendParam.to,
+            amountLD: amountLD,
+            minAmountLD: _sendParam.minAmountLD,
+            extraOptions: _sendParam.extraOptions,
+            composeMsg: composeMsg,
+            oftCmd: _sendParam.oftCmd
+        });
     }
 
     // --------------------------------------------
@@ -351,5 +334,29 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         }
 
         return _amountLD;
+    }
+
+    // --------------------------------------------
+    //  Helper
+    // --------------------------------------------
+
+    /// @notice Convert address to bytes32 for LayerZero data object
+    function _addressToBytes32(address _addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(_addr)));
+    }
+
+    /// @notice Build message and options from memory SendParam (parent's _buildMsgAndOptions requires calldata)
+    /// @param _extraOptions Must be calldata for combineOptions; pass from original _sendParam when available
+    function _buildMsgAndOptionsMemory(
+        SendParam memory _sendParam,
+        uint256 _amountLD,
+        bytes calldata _extraOptions
+    ) internal view returns (bytes memory message, bytes memory options) {
+        bool hasCompose;
+        (message, hasCompose) = OFTMsgCodec.encode(_sendParam.to, _toSD(_amountLD), _sendParam.composeMsg);
+        uint16 msgType = hasCompose ? SEND_AND_CALL : SEND;
+        options = combineOptions(_sendParam.dstEid, msgType, _extraOptions);
+        address inspector = msgInspector;
+        if (inspector != address(0)) IOAppMsgInspector(inspector).inspect(message, options);
     }
 }
