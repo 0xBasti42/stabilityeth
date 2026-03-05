@@ -1,7 +1,7 @@
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-black.svg)](https://mariadb.com/bsl11) [![solidity](https://img.shields.io/badge/solidity-%5E0.8.34-black)](https://docs.soliditylang.org/en/v0.8.34/) [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-000000.svg)](https://getfoundry.sh/)
 
 <p align="center">
-  <img src="banner.png" alt="StabilityETH by Isla Labs" width="100%">
+  <img src="../banner.png" alt="StabilityETH by Isla Labs" width="100%">
 </p>
 
 # SETH ♢
