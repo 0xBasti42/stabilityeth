@@ -232,6 +232,26 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         });
     }
 
+    /// @notice Convert address to bytes32 for LayerZero data object
+    function _addressToBytes32(address _addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(_addr)));
+    }
+
+    /// @notice Build message and options from memory SendParam (parent's _buildMsgAndOptions requires calldata)
+    /// @param _extraOptions Must be calldata for combineOptions; pass from original _sendParam when available
+    function _buildMsgAndOptionsMemory(
+        SendParam memory _sendParam,
+        uint256 _amountLD,
+        bytes calldata _extraOptions
+    ) internal view returns (bytes memory message, bytes memory options) {
+        bool hasCompose;
+        (message, hasCompose) = OFTMsgCodec.encode(_sendParam.to, _toSD(_amountLD), _sendParam.composeMsg);
+        uint16 msgType = hasCompose ? SEND_AND_CALL : SEND;
+        options = combineOptions(_sendParam.dstEid, msgType, _extraOptions);
+        address inspector = msgInspector;
+        if (inspector != address(0)) IOAppMsgInspector(inspector).inspect(message, options);
+    }
+
     // --------------------------------------------
     //  Receive Cross-Chain ETH Collateral
     // --------------------------------------------
@@ -334,29 +354,5 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         }
 
         return _amountLD;
-    }
-
-    // --------------------------------------------
-    //  Helper
-    // --------------------------------------------
-
-    /// @notice Convert address to bytes32 for LayerZero data object
-    function _addressToBytes32(address _addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(_addr)));
-    }
-
-    /// @notice Build message and options from memory SendParam (parent's _buildMsgAndOptions requires calldata)
-    /// @param _extraOptions Must be calldata for combineOptions; pass from original _sendParam when available
-    function _buildMsgAndOptionsMemory(
-        SendParam memory _sendParam,
-        uint256 _amountLD,
-        bytes calldata _extraOptions
-    ) internal view returns (bytes memory message, bytes memory options) {
-        bool hasCompose;
-        (message, hasCompose) = OFTMsgCodec.encode(_sendParam.to, _toSD(_amountLD), _sendParam.composeMsg);
-        uint16 msgType = hasCompose ? SEND_AND_CALL : SEND;
-        options = combineOptions(_sendParam.dstEid, msgType, _extraOptions);
-        address inspector = msgInspector;
-        if (inspector != address(0)) IOAppMsgInspector(inspector).inspect(message, options);
     }
 }
