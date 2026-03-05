@@ -23,3 +23,7 @@ Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and st
 ## Contact
 
 The primary security contact for StabilityETH is security@islalabs.co.
+
+<p align="center">
+  <img src="banner.png" alt="StabilityETH by Isla Labs" width="100%">
+</p>
