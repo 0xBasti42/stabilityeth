@@ -9,6 +9,7 @@ import { OFTComposeMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTCom
 import { OFTMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTMsgCodec.sol";
 import { ILayerZeroComposer } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroComposer.sol";
 import { Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppReceiver.sol";
+import { IOAppMsgInspector } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppMsgInspector.sol";
 
 interface ISETH {
     function EXCHANGE_RATE() external view returns (uint256);
@@ -100,6 +101,21 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         return bytes32(uint256(uint160(_addr)));
     }
 
+    /// @notice Build message and options from memory SendParam (parent's _buildMsgAndOptions requires calldata)
+    /// @param _extraOptions Must be calldata for combineOptions; pass from original _sendParam when available
+    function _buildMsgAndOptionsMemory(
+        SendParam memory _sendParam,
+        uint256 _amountLD,
+        bytes calldata _extraOptions
+    ) internal view returns (bytes memory message, bytes memory options) {
+        bool hasCompose;
+        (message, hasCompose) = OFTMsgCodec.encode(_sendParam.to, _toSD(_amountLD), _sendParam.composeMsg);
+        uint16 msgType = hasCompose ? SEND_AND_CALL : SEND;
+        options = combineOptions(_sendParam.dstEid, msgType, _extraOptions);
+        address inspector = msgInspector;
+        if (inspector != address(0)) IOAppMsgInspector(inspector).inspect(message, options);
+    }
+
     // --------------------------------------------
     //  Quote Fee
     // --------------------------------------------
@@ -115,6 +131,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
         uint256 ethAmountForQuote = amountSentLD / ISETH(seth).EXCHANGE_RATE();
         bytes memory composeForQuote = abi.encode(uint256(0));
+
         SendParam memory ethParam = SendParam({
             dstEid: _sendParam.dstEid,
             to: _addressToBytes32(dstAdapter),
@@ -125,6 +142,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             oftCmd: ""
         });
         MessagingFee memory ethFee = IOFT(ethOft).quoteSend(ethParam, false);
+
         SendParam memory sethParamForQuote = SendParam({
             dstEid: _sendParam.dstEid,
             to: _sendParam.to,
@@ -134,8 +152,9 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             composeMsg: composeForQuote,
             oftCmd: _sendParam.oftCmd
         });
-        (bytes memory message, bytes memory options) = _buildMsgAndOptions(sethParamForQuote, amountSentLD);
+        (bytes memory message, bytes memory options) = _buildMsgAndOptionsMemory(sethParamForQuote, amountSentLD, _sendParam.extraOptions);
         MessagingFee memory sethFee = _quote(_sendParam.dstEid, message, options, _payInLzToken);
+
         return MessagingFee({ nativeFee: sethFee.nativeFee + ethFee.nativeFee, lzTokenFee: sethFee.lzTokenFee + ethFee.lzTokenFee });
     }
 
@@ -167,39 +186,18 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
 
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
-
         uint256 transferId = ++transferIdCounter;
         bytes memory transferIdPayload = abi.encode(transferId);
 
-        // Quote fees (use amountSentLD as approx; fee impact on quote is negligible)
-        uint256 ethAmountForQuote = amountSentLD / ISETH(seth).EXCHANGE_RATE();
-        SendParam memory ethParamForQuote = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _addressToBytes32(dstAdapter),
-            amountLD: ethAmountForQuote,
-            minAmountLD: ethAmountForQuote,
-            extraOptions: "",
-            composeMsg: transferIdPayload,
-            oftCmd: ""
-        });
-        MessagingFee memory ethFee = IOFT(ethOft).quoteSend(ethParamForQuote, false);
-        SendParam memory sethParamApprox = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _sendParam.to,
-            amountLD: amountSentLD,
-            minAmountLD: _sendParam.minAmountLD,
-            extraOptions: _sendParam.extraOptions,
-            composeMsg: transferIdPayload,
-            oftCmd: _sendParam.oftCmd
-        });
-        (bytes memory messageApprox, bytes memory optionsApprox) = _buildMsgAndOptions(sethParamApprox, amountSentLD);
-        MessagingFee memory sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, false);
-
-        uint256 totalFees = sethFee.nativeFee + ethFee.nativeFee;
-        uint256 feeSethAmount = totalFees * ISETH(seth).EXCHANGE_RATE();
-        uint256 amountReceivedLD = amountSentLD - feeSethAmount;
+        // ─── Phase 1: Quote ─────────────────────────────────────────────────────
+        (MessagingFee memory ethFee, uint256 amountReceivedLD) =
+            _quoteSendFees(_sendParam, amountSentLD, transferIdPayload, dstAdapter);
 
         if (amountReceivedLD < _sendParam.minAmountLD) revert IOFT.SlippageExceeded(amountReceivedLD, _sendParam.minAmountLD);
+
+        // ─── Phase 2: Execute ───────────────────────────────────────────────────
+        minterBurner.burn(msg.sender, amountSentLD);
+        ISETH(seth).releaseCollateral(amountSentLD);
 
         uint256 ethAmount = amountReceivedLD / ISETH(seth).EXCHANGE_RATE();
         SendParam memory ethParam = SendParam({
@@ -211,15 +209,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             composeMsg: transferIdPayload,
             oftCmd: ""
         });
-
-        // 1. Debit SETH (full amount; fee deducted from received)
-        minterBurner.burn(msg.sender, amountSentLD);
-
-        // 2. Release ETH from SETH, bridge via ethOft
-        ISETH(seth).releaseCollateral(amountSentLD);
         IOFT(ethOft).send{value: ethAmount + ethFee.nativeFee}(ethParam, ethFee, _refundAddress);
 
-        // 3. Send SETH OFT message (peer mints amountReceivedLD on destination when ETH has arrived)
         SendParam memory sethParam = SendParam({
             dstEid: _sendParam.dstEid,
             to: _sendParam.to,
@@ -229,11 +220,53 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             composeMsg: transferIdPayload,
             oftCmd: _sendParam.oftCmd
         });
-        (bytes memory message, bytes memory options) = _buildMsgAndOptions(sethParam, amountReceivedLD);
-        sethFee = _quote(_sendParam.dstEid, message, options, false);
+        (bytes memory message, bytes memory options) = _buildMsgAndOptionsMemory(sethParam, amountReceivedLD, _sendParam.extraOptions);
+        MessagingFee memory sethFee = _quote(_sendParam.dstEid, message, options, false);
+
         msgReceipt = _lzSend(_sendParam.dstEid, message, options, sethFee, _refundAddress);
         oftReceipt = OFTReceipt(amountSentLD, amountReceivedLD);
+
         emit OFTSent(msgReceipt.guid, _sendParam.dstEid, msg.sender, amountSentLD, amountReceivedLD);
+    }
+
+    /**
+     * @notice Phase 1: Quotes ETH and SETH LayerZero fees, computes amountReceivedLD after fee deduction
+     * @dev Uses amountSentLD for quotes; fee impact on message size is negligible
+     */
+    function _quoteSendFees(
+        SendParam calldata _sendParam,
+        uint256 amountSentLD,
+        bytes memory transferIdPayload,
+        address dstAdapter
+    ) internal returns (MessagingFee memory ethFee, uint256 amountReceivedLD) {
+        uint256 ethAmountForQuote = amountSentLD / ISETH(seth).EXCHANGE_RATE();
+        SendParam memory ethParamForQuote = SendParam({
+            dstEid: _sendParam.dstEid,
+            to: _addressToBytes32(dstAdapter),
+            amountLD: ethAmountForQuote,
+            minAmountLD: ethAmountForQuote,
+            extraOptions: "",
+            composeMsg: transferIdPayload,
+            oftCmd: ""
+        });
+        ethFee = IOFT(ethOft).quoteSend(ethParamForQuote, false);
+
+        SendParam memory sethParamApprox = SendParam({
+            dstEid: _sendParam.dstEid,
+            to: _sendParam.to,
+            amountLD: amountSentLD,
+            minAmountLD: _sendParam.minAmountLD,
+            extraOptions: _sendParam.extraOptions,
+            composeMsg: transferIdPayload,
+            oftCmd: _sendParam.oftCmd
+        });
+        (bytes memory messageApprox, bytes memory optionsApprox) =
+            _buildMsgAndOptionsMemory(sethParamApprox, amountSentLD, _sendParam.extraOptions);
+        MessagingFee memory sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, false);
+
+        uint256 totalFees = sethFee.nativeFee + ethFee.nativeFee;
+        uint256 feeSethAmount = totalFees * ISETH(seth).EXCHANGE_RATE();
+        amountReceivedLD = amountSentLD - feeSethAmount;
     }
 
     // --------------------------------------------
@@ -256,10 +289,12 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
         bytes memory rawCompose = OFTComposeMsgCodec.composeMsg(_message);
+
         uint256 transferId;
         assembly {
             transferId := mload(add(add(rawCompose, 32), 32))
         }
+
         ethQueue[transferId] = amountLD;
         _processPendingMint(transferId);
     }
@@ -270,10 +305,13 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     function _processPendingMint(uint256 _transferId) internal {
         PendingMint memory pm = pendingMints[_transferId];
         if (pm.to == address(0)) return;
+
         uint256 ethAmount = ethQueue[_transferId];
         if (ethAmount == 0) return;
+
         delete ethQueue[_transferId];
         delete pendingMints[_transferId];
+
         ISETH(seth).receiveCollateral{value: ethAmount}();
         minterBurner.mint(pm.to, pm.amountLD);
     }
@@ -294,16 +332,20 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         bytes calldata /* _extraData */
     ) internal virtual override {
         if (!OFTMsgCodec.isComposed(_message)) revert InvalidComposeSender();
+
         address toAddress = OFTMsgCodec.bytes32ToAddress(OFTMsgCodec.sendTo(_message));
         uint256 amountReceivedLD = _toLD(OFTMsgCodec.amountSD(_message));
         bytes memory rawCompose = OFTMsgCodec.composeMsg(_message);
+
         uint256 transferId;
         assembly {
             transferId := mload(add(add(rawCompose, 32), 32))
         }
+
         _creditTransferId = transferId;
         _credit(toAddress, amountReceivedLD, _origin.srcEid);
-        _creditTransferId = 0;
+
+        _creditTransferId = 0; // WHY RESET TO ZERO?
         emit OFTReceived(_guid, _origin.srcEid, toAddress, amountReceivedLD);
     }
 
@@ -315,9 +357,11 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         uint256 _amountLD,
         uint32 /* _srcEid */
     ) internal virtual override returns (uint256) {
-        if (_to == address(0)) _to = address(0xdead);
+        if (_to == address(0)) _to = address(0xdead); // WHY SPECIFY DEAD ADDRESS - SHOULDN'T THIS ALWAYS BE A REAL ADDRESS?
+
         uint256 transferId = _creditTransferId;
         uint256 ethAmount = _amountLD / ISETH(seth).EXCHANGE_RATE();
+
         if (ethQueue[transferId] > 0) {
             delete ethQueue[transferId];
             ISETH(seth).receiveCollateral{value: ethAmount}();
@@ -325,6 +369,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         } else {
             pendingMints[transferId] = PendingMint({ to: _to, amountLD: _amountLD });
         }
+
         return _amountLD;
     }
 }
