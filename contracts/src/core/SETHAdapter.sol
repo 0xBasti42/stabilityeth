@@ -68,8 +68,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         address _seth,
         address _ethOft,
         address _lzEndpoint,
-        address _owner
-    ) MintBurnOFTAdapter(_seth, IMintableBurnable(_seth), _lzEndpoint, _owner) {
+        address _orchestrator
+    ) MintBurnOFTAdapter(_seth, IMintableBurnable(_seth), _lzEndpoint, _orchestrator) {
         if (_seth == address(0) || _ethOft == address(0)) revert InvalidAddress();
         seth = _seth;
         ethOft = _ethOft;
