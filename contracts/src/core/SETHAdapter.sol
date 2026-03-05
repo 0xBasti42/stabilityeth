@@ -25,14 +25,14 @@ interface ISETH {
  * @custom:security-contact security@islalabs.co
  */
 contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
-    address public seth;
+    address public immutable SETH;
 
     // --------------------------------------------
     //  Configuration
     // --------------------------------------------
 
     /// @notice ETH OFT address on srcChain
-    address public ethOft;
+    address public immutable ETH_OFT;
 
     /// @notice SETHAdapter addresses on dstChains
     mapping(uint32 => address) public sethAdapters;
@@ -40,7 +40,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     /// @notice Monotonic transfer ID for correlating ETH and SETH messages
     uint256 public transferIdCounter;
 
-    /// @notice ETH received for transferId (from ethOft lzCompose)
+    /// @notice ETH received for transferId (from ETH_OFT lzCompose)
     mapping(uint256 => uint256) public ethQueue;
 
     /// @notice Pending mints when SETH arrives before ETH
@@ -73,13 +73,13 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         address _orchestrator
     ) MintBurnOFTAdapter(_seth, IMintableBurnable(_seth), _lzEndpoint, _orchestrator) {
         if (_seth == address(0) || _ethOft == address(0)) revert InvalidAddress();
-        seth = _seth;
-        ethOft = _ethOft;
+        SETH = _seth;
+        ETH_OFT = _ethOft;
     }
 
-    /// @notice Receive ETH from ethOft; hold until lzCompose tags it with transferId
+    /// @notice Receive ETH from ETH_OFT; hold until lzCompose tags it with transferId
     receive() external payable {
-        if (msg.sender != ethOft) revert DirectDepositsDisabled();
+        if (msg.sender != ETH_OFT) revert DirectDepositsDisabled();
         // ETH stays in adapter; lzCompose will record ethQueue[transferId]
     }
 
@@ -154,11 +154,11 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
         // ─── Phase 2: Execute ───────────────────────────────────────────────────
         minterBurner.burn(msg.sender, amountSentLD);
-        ISETH(seth).releaseCollateral(amountSentLD);
+        ISETH(SETH).releaseCollateral(amountSentLD);
 
-        uint256 ethAmount = amountReceivedLD / ISETH(seth).EXCHANGE_RATE();
+        uint256 ethAmount = amountReceivedLD / ISETH(SETH).EXCHANGE_RATE();
         SendParam memory ethParam = _buildEthSendParam(_sendParam, dstAdapter, ethAmount, transferIdPayload);
-        IOFT(ethOft).send{value: ethAmount + ethFee.nativeFee}(ethParam, ethFee, _refundAddress);
+        IOFT(ETH_OFT).send{value: ethAmount + ethFee.nativeFee}(ethParam, ethFee, _refundAddress);
 
         SendParam memory sethParam = _buildSethSendParam(_sendParam, amountReceivedLD, transferIdPayload);
         (bytes memory message, bytes memory options) = _buildMsgAndOptionsMemory(sethParam, amountReceivedLD, _sendParam.extraOptions);
@@ -185,9 +185,9 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         address dstAdapter,
         bool _payInLzToken
     ) internal view returns (MessagingFee memory ethFee, MessagingFee memory sethFee, uint256 amountReceivedLD) {
-        uint256 ethAmountForQuote = amountSentLD / ISETH(seth).EXCHANGE_RATE();
+        uint256 ethAmountForQuote = amountSentLD / ISETH(SETH).EXCHANGE_RATE();
         SendParam memory ethParamForQuote = _buildEthSendParam(_sendParam, dstAdapter, ethAmountForQuote, composeMsg);
-        ethFee = IOFT(ethOft).quoteSend(ethParamForQuote, false);
+        ethFee = IOFT(ETH_OFT).quoteSend(ethParamForQuote, false);
 
         SendParam memory sethParamApprox = _buildSethSendParam(_sendParam, amountSentLD, composeMsg);
         (bytes memory messageApprox, bytes memory optionsApprox) =
@@ -195,7 +195,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, _payInLzToken);
 
         uint256 totalFees = sethFee.nativeFee + ethFee.nativeFee;
-        uint256 feeSethAmount = totalFees * ISETH(seth).EXCHANGE_RATE();
+        uint256 feeSethAmount = totalFees * ISETH(SETH).EXCHANGE_RATE();
         amountReceivedLD = amountSentLD - feeSethAmount;
     }
 
@@ -259,7 +259,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     // --------------------------------------------
 
     /**
-     * @notice Receives composeMsg from ethOft
+     * @notice Receives composeMsg from ETH_OFT
      * @dev Records ethQueue[transferId] = amountLD; processes pending mint if SETH message arrived first.
      */
     function lzCompose(
@@ -270,7 +270,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         bytes calldata /* _extraData */
     ) external payable override {
         if (msg.sender != address(endpoint)) revert InvalidComposeSender();
-        if (_from != ethOft) revert InvalidComposeSender();
+        if (_from != ETH_OFT) revert InvalidComposeSender();
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
         bytes memory rawCompose = OFTComposeMsgCodec.composeMsg(_message);
@@ -297,7 +297,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         delete ethQueue[_transferId];
         delete pendingMints[_transferId];
 
-        ISETH(seth).receiveCollateral{value: ethAmount}();
+        ISETH(SETH).receiveCollateral{value: ethAmount}();
         minterBurner.mint(pm.to, pm.amountLD);
     }
 
@@ -344,11 +344,11 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         if (_to == address(0)) _to = address(0xdead); // WHY SPECIFY DEAD ADDRESS - SHOULDN'T THIS ALWAYS BE A REAL ADDRESS?
 
         uint256 transferId = _creditTransferId;
-        uint256 ethAmount = _amountLD / ISETH(seth).EXCHANGE_RATE();
+        uint256 ethAmount = _amountLD / ISETH(SETH).EXCHANGE_RATE();
 
         if (ethQueue[transferId] > 0) {
             delete ethQueue[transferId];
-            ISETH(seth).receiveCollateral{value: ethAmount}();
+            ISETH(SETH).receiveCollateral{value: ethAmount}();
             minterBurner.mint(_to, _amountLD);
         } else {
             pendingMints[transferId] = PendingMint({ to: _to, amountLD: _amountLD });
