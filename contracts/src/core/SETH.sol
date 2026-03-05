@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.20;
 
-import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { ERC20 } from "@openzeppelin-v5/contracts/token/ERC20/ERC20.sol";
+import { ERC20Permit } from "@openzeppelin-v5/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import { ReentrancyGuard } from "@openzeppelin-v5/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title SETH | StabilityETH
  * @notice Omnichain SETH is minted and burned at a 100:1 ratio with ETH; provides Performance Based Returns (PBR) to verified applications
  * @dev Turns TVL into an additional source of revenue for verified applications | https://stability-eth.io/registry/
  */
-contract SETH is ERC20Permit, ReentrancyGuard {
+contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
     address public immutable sethAdapter;
 
     // --------------------------------------------
