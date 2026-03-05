@@ -2,8 +2,9 @@
   <img src="banner.png" alt="StabilityETH by Isla Labs" width="100%">
 </p>
 
-# SETH ♢
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-black.svg)](https://mariadb.com/bsl11) [![solidity](https://img.shields.io/badge/solidity-%5E0.8.34-black)](https://docs.soliditylang.org/en/v0.8.34/) [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-000000.svg)](https://getfoundry.sh/)
+
+# SETH ♢
 
 StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
 
