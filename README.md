@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="banner.png" alt="StabilityETH by Isla Labs" width="100%">
+</p>
+
 # StabilityETH
 
 StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
@@ -23,7 +27,3 @@ Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and st
 ## Contact
 
 The primary security contact for StabilityETH is security@islalabs.co.
-
-<p align="center">
-  <img src="banner.png" alt="StabilityETH by Isla Labs" width="100%">
-</p>
