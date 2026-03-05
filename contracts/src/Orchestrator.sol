@@ -12,9 +12,9 @@ pragma solidity ^0.8.34;
 contract Orchestrator {
 	address public multisig;
 
-    address public immutable sethAdapter;
-    address public immutable appRegistry;
-    address public immutable pbrManager;
+    address public immutable SETH_ADAPTER;
+    address public immutable APP_REGISTRY;
+    address public immutable PBR_MANAGER;
 
     // ------------------------------------------
 	//  Events/Errors
@@ -58,9 +58,9 @@ contract Orchestrator {
 
         multisig = _multisig;
 
-        sethAdapter = _sethAdapter;
-        appRegistry = _appRegistry;
-        pbrManager = _pbrManager;
+        SETH_ADAPTER = _sethAdapter;
+        APP_REGISTRY = _appRegistry;
+        PBR_MANAGER = _pbrManager;
 	}
 
 	receive() external payable { revert("ETH_DISABLED"); }

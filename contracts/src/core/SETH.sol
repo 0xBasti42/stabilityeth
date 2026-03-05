@@ -13,7 +13,7 @@ import { ReentrancyGuard } from "@openzeppelin-v5/contracts/utils/ReentrancyGuar
  * @custom:security-contact security@islalabs.co
  */
 contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
-    address public immutable sethAdapter;
+    address public immutable SETH_ADAPTER;
 
     // --------------------------------------------
     //  Configuration
@@ -46,7 +46,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
     // --------------------------------------------
 
     modifier onlyAdapter() {
-        if (msg.sender != sethAdapter) revert Unauthorized();
+        if (msg.sender != SETH_ADAPTER) revert Unauthorized();
         _;
     }
 
@@ -54,9 +54,9 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
     //  Initialization
     // --------------------------------------------
 
-    constructor(address _adapter) ERC20("StabilityETH", "SETH") ERC20Permit("StabilityETH") {
-        if (_adapter == address(0)) revert InvalidAddress();
-        sethAdapter = _adapter;
+    constructor(address _sethAdapter) ERC20("StabilityETH", "SETH") ERC20Permit("StabilityETH") {
+        if (_sethAdapter == address(0)) revert InvalidAddress();
+        SETH_ADAPTER = _sethAdapter;
     }
 
     // --------------------------------------------
