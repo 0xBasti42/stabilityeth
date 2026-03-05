@@ -129,31 +129,10 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
 
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
-        uint256 ethAmountForQuote = amountSentLD / ISETH(seth).EXCHANGE_RATE();
         bytes memory composeForQuote = abi.encode(uint256(0));
 
-        SendParam memory ethParam = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _addressToBytes32(dstAdapter),
-            amountLD: ethAmountForQuote,
-            minAmountLD: ethAmountForQuote,
-            extraOptions: "",
-            composeMsg: composeForQuote,
-            oftCmd: ""
-        });
-        MessagingFee memory ethFee = IOFT(ethOft).quoteSend(ethParam, false);
-
-        SendParam memory sethParamForQuote = SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _sendParam.to,
-            amountLD: amountSentLD,
-            minAmountLD: _sendParam.minAmountLD,
-            extraOptions: _sendParam.extraOptions,
-            composeMsg: composeForQuote,
-            oftCmd: _sendParam.oftCmd
-        });
-        (bytes memory message, bytes memory options) = _buildMsgAndOptionsMemory(sethParamForQuote, amountSentLD, _sendParam.extraOptions);
-        MessagingFee memory sethFee = _quote(_sendParam.dstEid, message, options, _payInLzToken);
+        (MessagingFee memory ethFee, MessagingFee memory sethFee, ) =
+            _quoteSendFees(_sendParam, amountSentLD, composeForQuote, dstAdapter, _payInLzToken);
 
         return MessagingFee({ nativeFee: sethFee.nativeFee + ethFee.nativeFee, lzTokenFee: sethFee.lzTokenFee + ethFee.lzTokenFee });
     }
@@ -190,8 +169,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         bytes memory transferIdPayload = abi.encode(transferId);
 
         // ─── Phase 1: Quote ─────────────────────────────────────────────────────
-        (MessagingFee memory ethFee, uint256 amountReceivedLD) =
-            _quoteSendFees(_sendParam, amountSentLD, transferIdPayload, dstAdapter);
+        (MessagingFee memory ethFee, , uint256 amountReceivedLD) =
+            _quoteSendFees(_sendParam, amountSentLD, transferIdPayload, dstAdapter, false);
 
         if (amountReceivedLD < _sendParam.minAmountLD) revert IOFT.SlippageExceeded(amountReceivedLD, _sendParam.minAmountLD);
 
@@ -230,15 +209,16 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     }
 
     /**
-     * @notice Phase 1: Quotes ETH and SETH LayerZero fees, computes amountReceivedLD after fee deduction
-     * @dev Uses amountSentLD for quotes; fee impact on message size is negligible
+     * @notice Quotes ETH and SETH LayerZero fees, computes amountReceivedLD after fee deduction
+     * @dev Uses amountSentLD for quotes; fee impact on message size is negligible. composeMsg can be abi.encode(0) for quoteSend.
      */
     function _quoteSendFees(
         SendParam calldata _sendParam,
         uint256 amountSentLD,
-        bytes memory transferIdPayload,
-        address dstAdapter
-    ) internal returns (MessagingFee memory ethFee, uint256 amountReceivedLD) {
+        bytes memory composeMsg,
+        address dstAdapter,
+        bool _payInLzToken
+    ) internal view returns (MessagingFee memory ethFee, MessagingFee memory sethFee, uint256 amountReceivedLD) {
         uint256 ethAmountForQuote = amountSentLD / ISETH(seth).EXCHANGE_RATE();
         SendParam memory ethParamForQuote = SendParam({
             dstEid: _sendParam.dstEid,
@@ -246,7 +226,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             amountLD: ethAmountForQuote,
             minAmountLD: ethAmountForQuote,
             extraOptions: "",
-            composeMsg: transferIdPayload,
+            composeMsg: composeMsg,
             oftCmd: ""
         });
         ethFee = IOFT(ethOft).quoteSend(ethParamForQuote, false);
@@ -257,12 +237,12 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             amountLD: amountSentLD,
             minAmountLD: _sendParam.minAmountLD,
             extraOptions: _sendParam.extraOptions,
-            composeMsg: transferIdPayload,
+            composeMsg: composeMsg,
             oftCmd: _sendParam.oftCmd
         });
         (bytes memory messageApprox, bytes memory optionsApprox) =
             _buildMsgAndOptionsMemory(sethParamApprox, amountSentLD, _sendParam.extraOptions);
-        MessagingFee memory sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, false);
+        sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, _payInLzToken);
 
         uint256 totalFees = sethFee.nativeFee + ethFee.nativeFee;
         uint256 feeSethAmount = totalFees * ISETH(seth).EXCHANGE_RATE();
