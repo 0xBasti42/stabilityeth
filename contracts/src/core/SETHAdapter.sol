@@ -50,8 +50,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     }
     mapping(uint256 => PendingMint) public pendingMints;
 
-    /// @dev Set by _lzReceive before calling _credit; read by _credit for transferId-based matching
-    uint256 private _creditTransferId;
+    /// @dev Set by _lzReceive before calling _credit; read by _credit for transferId-based matching.
+    uint256 private transient _creditTransferId;
 
     // --------------------------------------------
     //  Events & Errors
@@ -136,7 +136,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
     function _send(
         SendParam calldata _sendParam,
-        MessagingFee calldata _fee,
+        MessagingFee calldata /* _fee */,
         address _refundAddress
     ) internal virtual override returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt) {
         address dstAdapter = sethAdapters[_sendParam.dstEid];
@@ -165,7 +165,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         MessagingFee memory sethFee = _quote(_sendParam.dstEid, message, options, false);
 
         msgReceipt = _lzSend(_sendParam.dstEid, message, options, sethFee, _refundAddress);
-        oftReceipt = OFTReceipt(amountSentLD, amountReceivedLD);
+        oftReceipt = OFTReceipt({ amountSentLD: amountSentLD, amountReceivedLD: amountReceivedLD });
 
         emit OFTSent(msgReceipt.guid, _sendParam.dstEid, msg.sender, amountSentLD, amountReceivedLD);
     }
@@ -330,7 +330,6 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         _creditTransferId = transferId;
         _credit(toAddress, amountReceivedLD, _origin.srcEid);
 
-        _creditTransferId = 0; // WHY RESET TO ZERO?
         emit OFTReceived(_guid, _origin.srcEid, toAddress, amountReceivedLD);
     }
 
