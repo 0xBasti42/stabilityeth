@@ -20,7 +20,7 @@ interface ISETH {
 /**
  * @title SETHAdapter | StabilityETH
  * @notice LayerZero OFT wrapper for SETH which handles cross-chain collateral flows.
- * @dev Uses transferId in composeMsg to match ETH and SETH messages; only mints when ETH has arrived.
+ * @dev Uses (srcEid, transferId) composite key to match ETH and SETH messages; only mints when ETH has arrived.
  * @author Isla Labs (Tom Jarvis | 0xBasti42)
  * @custom:security-contact security@islalabs.co
  */
@@ -40,18 +40,19 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     /// @notice Monotonic transfer ID for correlating ETH and SETH messages
     uint256 public transferIdCounter;
 
-    /// @notice ETH received for transferId (from ETH_OFT lzCompose)
-    mapping(uint256 => uint256) public ethQueue;
+    /// @notice ETH received for (srcEid, transferId) from ETH_OFT lzCompose
+    mapping(uint32 srcEid => mapping(uint256 transferId => uint256)) public ethQueue;
 
     /// @notice Pending mints when SETH arrives before ETH
     struct PendingMint {
         address to;
         uint256 amountLD;
     }
-    mapping(uint256 => PendingMint) public pendingMints;
+    mapping(uint32 srcEid => mapping(uint256 transferId => PendingMint)) public pendingMints;
 
-    /// @dev Set by _lzReceive before calling _credit; read by _credit for transferId-based matching.
+    /// @dev Set by _lzReceive before calling _credit; read by _credit for (srcEid, transferId)-based matching.
     uint256 private transient _creditTransferId;
+    uint32 private transient _creditSrcEid;
 
     // --------------------------------------------
     //  Events & Errors
@@ -80,7 +81,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     /// @notice Receive ETH from ETH_OFT; hold until lzCompose tags it with transferId
     receive() external payable {
         if (msg.sender != ETH_OFT) revert DirectDepositsDisabled();
-        // ETH stays in adapter; lzCompose will record ethQueue[transferId]
+        // ETH stays in adapter; lzCompose will record ethQueue[srcEid][transferId]
     }
 
     // --------------------------------------------
@@ -260,7 +261,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
     /**
      * @notice Receives composeMsg from ETH_OFT
-     * @dev Records ethQueue[transferId] = amountLD; processes pending mint if SETH message arrived first.
+     * @dev Records ethQueue[srcEid][transferId] = amountLD; processes pending mint if SETH message arrived first.
+     *      srcEid from OFTComposeMsgCodec (set by ETH OFT from LayerZero origin) prevents cross-chain transferId collision.
      */
     function lzCompose(
         address _from,
@@ -272,6 +274,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         if (msg.sender != address(endpoint)) revert InvalidComposeSender();
         if (_from != ETH_OFT) revert InvalidComposeSender();
 
+        uint32 srcEid = OFTComposeMsgCodec.srcEid(_message);
         uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
         bytes memory rawCompose = OFTComposeMsgCodec.composeMsg(_message);
 
@@ -280,22 +283,22 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             transferId := mload(add(add(rawCompose, 32), 32))
         }
 
-        ethQueue[transferId] = amountLD;
-        _processPendingMint(transferId);
+        ethQueue[srcEid][transferId] = amountLD;
+        _processPendingMint(srcEid, transferId);
     }
 
     /**
      * @notice Relays collateral and processes SETH mint if SETH message has already arrived
      */
-    function _processPendingMint(uint256 _transferId) internal {
-        PendingMint memory pm = pendingMints[_transferId];
+    function _processPendingMint(uint32 _srcEid, uint256 _transferId) internal {
+        PendingMint memory pm = pendingMints[_srcEid][_transferId];
         if (pm.to == address(0)) return;
 
-        uint256 ethAmount = ethQueue[_transferId];
+        uint256 ethAmount = ethQueue[_srcEid][_transferId];
         if (ethAmount == 0) return;
 
-        delete ethQueue[_transferId];
-        delete pendingMints[_transferId];
+        delete ethQueue[_srcEid][_transferId];
+        delete pendingMints[_srcEid][_transferId];
 
         ISETH(SETH).receiveCollateral{value: ethAmount}();
         minterBurner.mint(pm.to, pm.amountLD);
@@ -307,7 +310,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
     /**
      * @notice Override: extracts transferId from composeMsg
-     * @dev Reads ethQueue[transferId] if ETH arrived first and mints; otherwise records pendingMints[transferId] for later.
+     * @dev Reads ethQueue[srcEid][transferId] if ETH arrived first and mints; otherwise records pendingMints[srcEid][transferId] for later.
      */
     function _lzReceive(
         Origin calldata _origin,
@@ -328,6 +331,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         }
 
         _creditTransferId = transferId;
+        _creditSrcEid = _origin.srcEid;
         _credit(toAddress, amountReceivedLD, _origin.srcEid);
 
         emit OFTReceived(_guid, _origin.srcEid, toAddress, amountReceivedLD);
@@ -341,17 +345,18 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         uint256 _amountLD,
         uint32 /* _srcEid */
     ) internal virtual override returns (uint256) {
-        if (_to == address(0)) _to = address(0xdead); // WHY SPECIFY DEAD ADDRESS - SHOULDN'T THIS ALWAYS BE A REAL ADDRESS?
+        if (_to == address(0)) _to = address(0xdead);
 
         uint256 transferId = _creditTransferId;
+        uint32 srcEid = _creditSrcEid;
         uint256 ethAmount = _amountLD / ISETH(SETH).EXCHANGE_RATE();
 
-        if (ethQueue[transferId] > 0) {
-            delete ethQueue[transferId];
+        if (ethQueue[srcEid][transferId] > 0) {
+            delete ethQueue[srcEid][transferId];
             ISETH(SETH).receiveCollateral{value: ethAmount}();
             minterBurner.mint(_to, _amountLD);
         } else {
-            pendingMints[transferId] = PendingMint({ to: _to, amountLD: _amountLD });
+            pendingMints[srcEid][transferId] = PendingMint({ to: _to, amountLD: _amountLD });
         }
 
         return _amountLD;
