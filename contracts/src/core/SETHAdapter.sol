@@ -2,14 +2,17 @@
 pragma solidity ^0.8.34;
 
 import { MintBurnOFTAdapter } from "@layerzerolabs/oft-evm/contracts/MintBurnOFTAdapter.sol";
+import { RateLimiter } from "@layerzerolabs/oapp-evm/contracts/oapp/utils/RateLimiter.sol";
+import { Pausable } from "@openzeppelin-v5/contracts/utils/Pausable.sol";
+import { ReentrancyGuardTransient } from "@openzeppelin-v5/contracts/utils/ReentrancyGuardTransient.sol";
+import { ILayerZeroComposer } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroComposer.sol";
 import { IOFT, SendParam, MessagingFee, OFTReceipt } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
-import { MessagingReceipt } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import { IMintableBurnable } from "@layerzerolabs/oft-evm/contracts/interfaces/IMintableBurnable.sol";
+import { IOAppMsgInspector } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppMsgInspector.sol";
+import { MessagingReceipt } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import { OFTComposeMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTComposeMsgCodec.sol";
 import { OFTMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTMsgCodec.sol";
-import { ILayerZeroComposer } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroComposer.sol";
 import { Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppReceiver.sol";
-import { IOAppMsgInspector } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppMsgInspector.sol";
 
 interface ISETH {
     function EXCHANGE_RATE() external view returns (uint256);
@@ -24,7 +27,7 @@ interface ISETH {
  * @author Isla Labs (Tom Jarvis | 0xBasti42)
  * @custom:security-contact security@islalabs.co
  */
-contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
+contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGuardTransient, ILayerZeroComposer {
     address public immutable SETH;
 
     // --------------------------------------------
@@ -36,6 +39,19 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
     /// @notice SETHAdapter addresses on dstChains
     mapping(uint32 => address) public sethAdapters;
+
+    // ─── Minimum transfer ───────────────────────────────────────────────────
+
+    /// @notice Minimum transfer amount in SETH wei (0 = disabled)
+    uint256 public minTransferAmountLD;
+
+    /// @dev Fixed-point unit for 18-decimal math (1e18 = 1 SETH)
+    uint256 private constant WAD = 1e18;
+
+    /// @dev Default minimum transfer: 0.1 SETH (WAD / 10)
+    uint256 private constant MIN_TRANSFER_DEFAULT = WAD / 10;
+
+    // ─── Liquidity coordination ─────────────────────────────────────────────
 
     /// @notice Monotonic transfer ID for correlating ETH and SETH messages
     uint256 public transferIdCounter;
@@ -59,6 +75,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     // --------------------------------------------
 
     event NewChainAdded(uint32 indexed eid, address adapter);
+    event MinTransferAmountSet(uint256 oldMin, uint256 newMin);
 
     error InvalidAddress();
     error InvalidEid();
@@ -68,6 +85,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     error SethAdapterNotSet(uint32 eid);
     error AdapterAlreadySet(uint32 eid);
     error InvalidComposeSender();
+    error InvalidRateLimitWindow();
+    error AmountBelowMinimum();
 
     // --------------------------------------------
     //  Initialization
@@ -82,6 +101,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         if (_seth == address(0) || _ethOft == address(0)) revert InvalidAddress();
         SETH = _seth;
         ETH_OFT = _ethOft;
+
+        minTransferAmountLD = MIN_TRANSFER_DEFAULT;
     }
 
     /// @notice Receive ETH from ETH_OFT; hold until lzCompose tags it with transferId
@@ -94,16 +115,26 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
     //  Upkeep
     // --------------------------------------------
 
-    /// @notice Add a new SETHAdapter address for a destination chain
+    /// @notice Add a new SETHAdapter address for a destination chain with the default rate limit
     /// @dev Each dstChain SETHAdapter relays ETH collateral from the other side of cross-chain transfers
     /// to maintain 1:100 collateralization on the chain's SETH contract.
-    function addSethAdapter(uint32 _eid, address _adapter) external onlyOwner {
+    function addSethAdapter(
+        uint32 _eid,
+        address _adapter,
+        uint192 _limit,
+        uint64 _window
+    ) external onlyOwner {
         if (_eid == 0) revert InvalidEid();
         if (_adapter == address(0)) revert InvalidAddress();
         if (sethAdapters[_eid] != address(0)) revert AdapterAlreadySet(_eid);
+        if (_window < 12) revert InvalidRateLimitWindow();
 
         sethAdapters[_eid] = _adapter;
         emit NewChainAdded(_eid, _adapter);
+
+        RateLimiter.RateLimitConfig[] memory configs = new RateLimiter.RateLimitConfig[](1);
+        configs[0] = RateLimiter.RateLimitConfig({ dstEid: _eid, limit: _limit, window: _window });
+        _setRateLimits(configs);
     }
 
     // --------------------------------------------
@@ -143,7 +174,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         SendParam calldata _sendParam,
         MessagingFee calldata _fee,
         address _refundAddress
-    ) external payable override returns (MessagingReceipt memory, OFTReceipt memory) {
+    ) external payable override whenNotPaused nonReentrant returns (MessagingReceipt memory, OFTReceipt memory) {
         return _send(_sendParam, _fee, _refundAddress);
     }
 
@@ -159,6 +190,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
         if (amountSentLD == 0) revert InvalidAmount();
+        if (minTransferAmountLD > 0 && amountSentLD < minTransferAmountLD) revert AmountBelowMinimum();
+
         uint256 transferId = ++transferIdCounter;
         bytes memory transferIdPayload = abi.encode(transferId);
 
@@ -167,6 +200,8 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             _quoteSendFees(_sendParam, amountSentLD, transferIdPayload, dstAdapter, false);
 
         if (amountReceivedLD < _sendParam.minAmountLD) revert IOFT.SlippageExceeded(amountReceivedLD, _sendParam.minAmountLD);
+
+        _outflow(_sendParam.dstEid, amountSentLD);
 
         // ─── Phase 2: Execute ───────────────────────────────────────────────────
         minterBurner.burn(msg.sender, amountSentLD);
@@ -285,7 +320,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         bytes calldata _message,
         address /* _executor */,
         bytes calldata /* _extraData */
-    ) external payable override {
+    ) external payable override nonReentrant {
         if (msg.sender != address(endpoint)) revert InvalidComposeSender();
         if (_from != ETH_OFT) revert InvalidComposeSender();
 
@@ -317,6 +352,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
 
         ISETH(SETH).receiveCollateral{value: ethAmount}();
         minterBurner.mint(pm.to, pm.amountLD);
+        _inflow(_srcEid, pm.amountLD);
     }
 
     // --------------------------------------------
@@ -333,7 +369,7 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
         bytes calldata _message,
         address /* _executor */,
         bytes calldata /* _extraData */
-    ) internal virtual override {
+    ) internal virtual override nonReentrant {
         if (!OFTMsgCodec.isComposed(_message)) revert InvalidComposeSender();
 
         address toAddress = OFTMsgCodec.bytes32ToAddress(OFTMsgCodec.sendTo(_message));
@@ -368,10 +404,44 @@ contract SETHAdapter is MintBurnOFTAdapter, ILayerZeroComposer {
             delete ethQueue[srcEid][transferId];
             ISETH(SETH).receiveCollateral{value: ethAmount}();
             minterBurner.mint(_to, _amountLD);
+            _inflow(srcEid, _amountLD);
         } else {
             pendingMints[srcEid][transferId] = PendingMint({ to: _to, amountLD: _amountLD });
         }
 
         return _amountLD;
+    }
+
+    // --------------------------------------------
+    //  Admin
+    // --------------------------------------------
+
+    /// @notice Set rate limits per destination chain
+    /// @dev Must be configured for each dstEid before sends are allowed. Use conservative limits initially.
+    function setRateLimits(RateLimiter.RateLimitConfig[] calldata _rateLimitConfigs) external onlyOwner {
+        _setRateLimits(_rateLimitConfigs);
+    }
+
+    /// @notice Reset rate limit in-flight amounts for given chains
+    function resetRateLimits(uint32[] calldata _eids) external onlyOwner {
+        _resetRateLimits(_eids);
+    }
+
+    /// @notice Pause outbound sends
+    /// @dev Inbound transfers (lzCompose, _lzReceive) remain enabled so in-flight transfers can complete.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpause outbound sends
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /// @notice Set minimum transfer amount
+    function setMinTransferAmount(uint256 _min) external onlyOwner {
+        uint256 oldMin = minTransferAmountLD;
+        minTransferAmountLD = _min;
+        emit MinTransferAmountSet(oldMin, _min);
     }
 }
