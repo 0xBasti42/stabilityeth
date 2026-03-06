@@ -159,6 +159,31 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         return MessagingFee({ nativeFee: sethFee.nativeFee + ethFee.nativeFee, lzTokenFee: sethFee.lzTokenFee + ethFee.lzTokenFee });
     }
 
+    /**
+     * @notice Quotes ETH and SETH LayerZero fees, computes amountReceivedLD after fee deduction
+     * @dev Uses amountSentLD for quotes; fee impact on message size is negligible. composeMsg can be abi.encode(0) for quoteSend.
+     */
+    function _quoteSendFees(
+        SendParam calldata _sendParam,
+        uint256 amountSentLD,
+        bytes memory composeMsg,
+        address dstAdapter,
+        bool _payInLzToken
+    ) internal view returns (MessagingFee memory ethFee, MessagingFee memory sethFee, uint256 amountReceivedLD) {
+        uint256 ethAmountForQuote = amountSentLD / ISETH(SETH).EXCHANGE_RATE();
+        SendParam memory ethParamForQuote = _buildEthSendParam(_sendParam, dstAdapter, ethAmountForQuote, composeMsg);
+        ethFee = IOFT(ETH_OFT).quoteSend(ethParamForQuote, false);
+
+        SendParam memory sethParamApprox = _buildSethSendParam(_sendParam, amountSentLD, composeMsg);
+        (bytes memory messageApprox, bytes memory optionsApprox) =
+            _buildMsgAndOptionsMemory(sethParamApprox, amountSentLD, _sendParam.extraOptions);
+        sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, _payInLzToken);
+
+        uint256 totalFees = sethFee.nativeFee + ethFee.nativeFee;
+        uint256 feeSethAmount = totalFees * ISETH(SETH).EXCHANGE_RATE();
+        amountReceivedLD = amountSentLD - feeSethAmount;
+    }
+
     // --------------------------------------------
     //  Send Cross-Chain
     // --------------------------------------------
@@ -224,31 +249,6 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
     // --------------------------------------------
     //  Internal
     // --------------------------------------------
-
-    /**
-     * @notice Quotes ETH and SETH LayerZero fees, computes amountReceivedLD after fee deduction
-     * @dev Uses amountSentLD for quotes; fee impact on message size is negligible. composeMsg can be abi.encode(0) for quoteSend.
-     */
-    function _quoteSendFees(
-        SendParam calldata _sendParam,
-        uint256 amountSentLD,
-        bytes memory composeMsg,
-        address dstAdapter,
-        bool _payInLzToken
-    ) internal view returns (MessagingFee memory ethFee, MessagingFee memory sethFee, uint256 amountReceivedLD) {
-        uint256 ethAmountForQuote = amountSentLD / ISETH(SETH).EXCHANGE_RATE();
-        SendParam memory ethParamForQuote = _buildEthSendParam(_sendParam, dstAdapter, ethAmountForQuote, composeMsg);
-        ethFee = IOFT(ETH_OFT).quoteSend(ethParamForQuote, false);
-
-        SendParam memory sethParamApprox = _buildSethSendParam(_sendParam, amountSentLD, composeMsg);
-        (bytes memory messageApprox, bytes memory optionsApprox) =
-            _buildMsgAndOptionsMemory(sethParamApprox, amountSentLD, _sendParam.extraOptions);
-        sethFee = _quote(_sendParam.dstEid, messageApprox, optionsApprox, _payInLzToken);
-
-        uint256 totalFees = sethFee.nativeFee + ethFee.nativeFee;
-        uint256 feeSethAmount = totalFees * ISETH(SETH).EXCHANGE_RATE();
-        amountReceivedLD = amountSentLD - feeSethAmount;
-    }
 
     /// @notice Build SendParam for ETH OFT (collateral bridge to dstAdapter)
     function _buildEthSendParam(
