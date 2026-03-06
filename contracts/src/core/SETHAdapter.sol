@@ -278,7 +278,8 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
 
         uint256 transferId;
         assembly {
-            transferId := mload(add(add(rawCompose, 32), 32))
+            // OFTComposeMsgCodec.composeMsg returns only the payload (transferId); read first word
+            transferId := mload(add(rawCompose, 32))
         }
 
         if (ethQueue[srcEid][transferId] != 0) revert InvalidAmount();
