@@ -266,6 +266,13 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         if (_from != ETH_OFT) revert InvalidComposeSender();
 
         uint32 srcEid = OFTComposeMsgCodec.srcEid(_message);
+        bytes32 composeFrom = OFTComposeMsgCodec.composeFrom(_message);
+        address expectedAdapter = sethAdapters[srcEid];
+        if (composeFrom != OFTComposeMsgCodec.addressToBytes32(owner())) {
+            if (expectedAdapter == address(0) || composeFrom != OFTComposeMsgCodec.addressToBytes32(expectedAdapter)) {
+                revert InvalidComposeSender();
+            }
+        }
         uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
         bytes memory rawCompose = OFTComposeMsgCodec.composeMsg(_message);
 
