@@ -247,65 +247,6 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
     }
 
     // --------------------------------------------
-    //  Internal
-    // --------------------------------------------
-
-    /// @notice Build SendParam for ETH OFT (collateral bridge to dstAdapter)
-    function _buildEthSendParam(
-        SendParam calldata _sendParam,
-        address dstAdapter,
-        uint256 ethAmount,
-        bytes memory composeMsg
-    ) internal pure returns (SendParam memory) {
-        return SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _addressToBytes32(dstAdapter),
-            amountLD: ethAmount,
-            minAmountLD: ethAmount,
-            extraOptions: "",
-            composeMsg: composeMsg,
-            oftCmd: ""
-        });
-    }
-
-    /// @notice Build SendParam for SETH message (user-facing OFT params with variable amount/composeMsg)
-    function _buildSethSendParam(
-        SendParam calldata _sendParam,
-        uint256 amountLD,
-        bytes memory composeMsg
-    ) internal pure returns (SendParam memory) {
-        return SendParam({
-            dstEid: _sendParam.dstEid,
-            to: _sendParam.to,
-            amountLD: amountLD,
-            minAmountLD: _sendParam.minAmountLD,
-            extraOptions: _sendParam.extraOptions,
-            composeMsg: composeMsg,
-            oftCmd: _sendParam.oftCmd
-        });
-    }
-
-    /// @notice Convert address to bytes32 for LayerZero data object
-    function _addressToBytes32(address _addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(_addr)));
-    }
-
-    /// @notice Build message and options from memory SendParam (parent's _buildMsgAndOptions requires calldata)
-    /// @param _extraOptions Must be calldata for combineOptions; pass from original _sendParam when available
-    function _buildMsgAndOptionsMemory(
-        SendParam memory _sendParam,
-        uint256 _amountLD,
-        bytes calldata _extraOptions
-    ) internal view returns (bytes memory message, bytes memory options) {
-        bool hasCompose;
-        (message, hasCompose) = OFTMsgCodec.encode(_sendParam.to, _toSD(_amountLD), _sendParam.composeMsg);
-        uint16 msgType = hasCompose ? SEND_AND_CALL : SEND;
-        options = combineOptions(_sendParam.dstEid, msgType, _extraOptions);
-        address inspector = msgInspector;
-        if (inspector != address(0)) IOAppMsgInspector(inspector).inspect(message, options);
-    }
-
-    // --------------------------------------------
     //  Receive Cross-Chain ETH Collateral
     // --------------------------------------------
 
@@ -360,7 +301,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
     }
 
     // --------------------------------------------
-    //  Receive Cross-Chain SETH
+    //  Receive Cross-Chain SETH Message
     // --------------------------------------------
 
     /**
@@ -417,6 +358,65 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         }
 
         return _amountLD;
+    }
+
+    // --------------------------------------------
+    //  Internal
+    // --------------------------------------------
+
+    /// @notice Build SendParam for ETH OFT (collateral bridge to dstAdapter)
+    function _buildEthSendParam(
+        SendParam calldata _sendParam,
+        address dstAdapter,
+        uint256 ethAmount,
+        bytes memory composeMsg
+    ) internal pure returns (SendParam memory) {
+        return SendParam({
+            dstEid: _sendParam.dstEid,
+            to: _addressToBytes32(dstAdapter),
+            amountLD: ethAmount,
+            minAmountLD: ethAmount,
+            extraOptions: "",
+            composeMsg: composeMsg,
+            oftCmd: ""
+        });
+    }
+
+    /// @notice Build SendParam for SETH message (user-facing OFT params with variable amount/composeMsg)
+    function _buildSethSendParam(
+        SendParam calldata _sendParam,
+        uint256 amountLD,
+        bytes memory composeMsg
+    ) internal pure returns (SendParam memory) {
+        return SendParam({
+            dstEid: _sendParam.dstEid,
+            to: _sendParam.to,
+            amountLD: amountLD,
+            minAmountLD: _sendParam.minAmountLD,
+            extraOptions: _sendParam.extraOptions,
+            composeMsg: composeMsg,
+            oftCmd: _sendParam.oftCmd
+        });
+    }
+
+    /// @notice Convert address to bytes32 for LayerZero data object
+    function _addressToBytes32(address _addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(_addr)));
+    }
+
+    /// @notice Build message and options from memory SendParam (parent's _buildMsgAndOptions requires calldata)
+    /// @param _extraOptions Must be calldata for combineOptions; pass from original _sendParam when available
+    function _buildMsgAndOptionsMemory(
+        SendParam memory _sendParam,
+        uint256 _amountLD,
+        bytes calldata _extraOptions
+    ) internal view returns (bytes memory message, bytes memory options) {
+        bool hasCompose;
+        (message, hasCompose) = OFTMsgCodec.encode(_sendParam.to, _toSD(_amountLD), _sendParam.composeMsg);
+        uint16 msgType = hasCompose ? SEND_AND_CALL : SEND;
+        options = combineOptions(_sendParam.dstEid, msgType, _extraOptions);
+        address inspector = msgInspector;
+        if (inspector != address(0)) IOAppMsgInspector(inspector).inspect(message, options);
     }
 
     // --------------------------------------------
