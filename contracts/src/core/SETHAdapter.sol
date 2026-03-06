@@ -333,6 +333,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
             transferId := mload(add(add(rawCompose, 32), 32))
         }
 
+        if (ethQueue[srcEid][transferId] != 0) revert InvalidAmount();
         ethQueue[srcEid][transferId] = amountLD;
         _processPendingMint(srcEid, transferId);
     }
@@ -346,6 +347,9 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
 
         uint256 ethAmount = ethQueue[_srcEid][_transferId];
         if (ethAmount == 0) return;
+
+        uint256 expectedEthAmount = pm.amountLD / ISETH(SETH).EXCHANGE_RATE();
+        if (ethAmount != expectedEthAmount) revert InvalidAmount();
 
         delete ethQueue[_srcEid][_transferId];
         delete pendingMints[_srcEid][_transferId];
@@ -399,13 +403,16 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         uint256 transferId = _creditTransferId;
         uint32 srcEid = _creditSrcEid;
         uint256 ethAmount = _amountLD / ISETH(SETH).EXCHANGE_RATE();
+        uint256 queuedEthAmount = ethQueue[srcEid][transferId];
 
-        if (ethQueue[srcEid][transferId] > 0) {
+        if (queuedEthAmount > 0) {
+            if (queuedEthAmount != ethAmount) revert InvalidAmount();
             delete ethQueue[srcEid][transferId];
             ISETH(SETH).receiveCollateral{value: ethAmount}();
             minterBurner.mint(_to, _amountLD);
             _inflow(srcEid, _amountLD);
         } else {
+            if (pendingMints[srcEid][transferId].to != address(0)) revert InvalidAmount();
             pendingMints[srcEid][transferId] = PendingMint({ to: _to, amountLD: _amountLD });
         }
 
