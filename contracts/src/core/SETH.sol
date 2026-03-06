@@ -184,6 +184,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
     // --------------------------------------------
 
     /// @notice Check if the 1:100 collateral ratio is maintained
+    /// @dev Uses ethCollateral() (balance minus accrued fees) so fee liabilities are excluded from backing
     function isFullyBacked() external view returns (bool fullyBacked, uint256 collateralRatioBps) {
         uint256 supply = totalSupply();
         
@@ -191,7 +192,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
             return (true, BPS_DENOMINATOR); // 100% backed if no supply
         }
         
-        uint256 collateral = address(this).balance;
+        uint256 collateral = address(this).balance - accruedFees;
         
         collateralRatioBps = (collateral * EXCHANGE_RATE * BPS_DENOMINATOR) / supply;
         fullyBacked = collateralRatioBps >= BPS_DENOMINATOR;
