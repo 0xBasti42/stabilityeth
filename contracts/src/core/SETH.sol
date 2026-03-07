@@ -81,10 +81,13 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
 
     /**
      * @notice Burns SETH and withdraws ETH at 100:1 ratio
+     * @dev Rounds down to nearest multiple of EXCHANGE_RATE; dust stays with caller
      */
     function withdraw(uint256 sethAmount) external nonReentrant {
-        _burn(msg.sender, sethAmount);
-        (bool success, ) = msg.sender.call{value: sethAmount / EXCHANGE_RATE}("");
+        // Round down to maintain 1:100 collateralization; dust stays with sender (up to 99 wei)
+        uint256 amountToWithdraw = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
+        _burn(msg.sender, amountToWithdraw);
+        (bool success, ) = msg.sender.call{value: amountToWithdraw / EXCHANGE_RATE}("");
         if (!success) revert EthTransferFailed();
     }
 

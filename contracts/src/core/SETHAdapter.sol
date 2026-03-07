@@ -214,6 +214,9 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
 
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
+        uint256 rate = ISETH(SETH).EXCHANGE_RATE();
+        // Round down to maintain 1:100 collateralization; dust stays with sender (up to 99 wei)
+        amountSentLD = (amountSentLD / rate) * rate;
         if (amountSentLD == 0) revert InvalidAmount();
         if (minTransferAmountLD > 0 && amountSentLD < minTransferAmountLD) revert AmountBelowMinimum();
 
@@ -224,6 +227,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         (MessagingFee memory ethFee, , uint256 amountReceivedLD) =
             _quoteSendFees(_sendParam, amountSentLD, transferIdPayload, dstAdapter, false);
 
+        amountReceivedLD = (amountReceivedLD / rate) * rate; // Round down; dust from fee subtraction not sent
         if (amountReceivedLD < _sendParam.minAmountLD) revert IOFT.SlippageExceeded(amountReceivedLD, _sendParam.minAmountLD);
 
         _outflow(_sendParam.dstEid, amountSentLD);
@@ -297,15 +301,18 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         uint256 ethAmount = ethQueue[_srcEid][_transferId];
         if (ethAmount == 0) return;
 
-        uint256 expectedEthAmount = pm.amountLD / ISETH(SETH).EXCHANGE_RATE();
+        uint256 rate = ISETH(SETH).EXCHANGE_RATE();
+        // Round down to maintain 1:100 collateralization; excess SETH (up to 99 wei) is not minted
+        uint256 amountToMint = (pm.amountLD / rate) * rate;
+        uint256 expectedEthAmount = amountToMint / rate;
         if (ethAmount != expectedEthAmount) revert InvalidAmount();
 
         delete ethQueue[_srcEid][_transferId];
         delete pendingMints[_srcEid][_transferId];
 
         ISETH(SETH).receiveCollateral{value: ethAmount}();
-        minterBurner.mint(pm.to, pm.amountLD);
-        _inflow(_srcEid, pm.amountLD);
+        minterBurner.mint(pm.to, amountToMint);
+        _inflow(_srcEid, amountToMint);
     }
 
     // --------------------------------------------
@@ -336,9 +343,9 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
 
         _creditTransferId = transferId;
         _creditSrcEid = _origin.srcEid;
-        _credit(toAddress, amountReceivedLD, _origin.srcEid);
+        uint256 amountCreditedLD = _credit(toAddress, amountReceivedLD, _origin.srcEid);
 
-        emit OFTReceived(_guid, _origin.srcEid, toAddress, amountReceivedLD);
+        emit OFTReceived(_guid, _origin.srcEid, toAddress, amountCreditedLD);
     }
 
     /**
@@ -351,21 +358,24 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
     ) internal virtual override returns (uint256) {
         uint256 transferId = _creditTransferId;
         uint32 srcEid = _creditSrcEid;
-        uint256 ethAmount = _amountLD / ISETH(SETH).EXCHANGE_RATE();
+        uint256 rate = ISETH(SETH).EXCHANGE_RATE();
+        // Round down to maintain 1:100 collateralization; excess SETH (up to 99 wei) is not minted
+        uint256 amountToMint = (_amountLD / rate) * rate;
+        uint256 ethAmount = amountToMint / rate;
         uint256 queuedEthAmount = ethQueue[srcEid][transferId];
 
         if (queuedEthAmount > 0) {
             if (queuedEthAmount != ethAmount) revert InvalidAmount();
             delete ethQueue[srcEid][transferId];
             ISETH(SETH).receiveCollateral{value: ethAmount}();
-            minterBurner.mint(_to, _amountLD);
-            _inflow(srcEid, _amountLD);
+            minterBurner.mint(_to, amountToMint);
+            _inflow(srcEid, amountToMint);
         } else {
             if (pendingMints[srcEid][transferId].to != address(0)) revert InvalidAmount();
-            pendingMints[srcEid][transferId] = PendingMint({ to: _to, amountLD: _amountLD });
+            pendingMints[srcEid][transferId] = PendingMint({ to: _to, amountLD: amountToMint });
         }
 
-        return _amountLD;
+        return amountToMint;
     }
 
     // --------------------------------------------
