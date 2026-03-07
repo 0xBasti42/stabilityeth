@@ -164,17 +164,20 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
     //  View Functions
     // --------------------------------------------
 
-    /// @notice Total SETH supply across all chains
-    function chainSupply() external view returns (uint256) {
+    /// @notice Total SETH supply on deployment chain
+    /// @dev Does not account for total SETH supply across all chains
+    function sethSupply() external view returns (uint256) {
         return totalSupply();
     }
 
-    /// @notice Get the ETH collateral backing outstanding SETH tokens
+    /// @notice ETH collateral balance that backs SETH supply
+    /// @dev Does not account for total ETH collateral across all chains
     function ethCollateral() external view returns (uint256) {
         return address(this).balance - accruedFees;
     }
 
     /// @notice Get the ETH value of currently accrued fees
+    /// @dev Does not account for total fees accrued in ETH across all chains
     function accruedFeesInEth() external view returns (uint256) {
         return accruedFees;
     }
