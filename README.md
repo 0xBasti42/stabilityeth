@@ -26,6 +26,10 @@ SETH is fully collateralized by ETH at a 100:1 ratio (1 SETH = 0.01 ETH). Cross-
 
 Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and start earning Performance Based Returns (PBR). New EVM chains can be deployed automatically from the UI.
 
+## Contact
+
+The primary security contact for StabilityETH is security@islalabs.co.
+
 ## Security
 
 Audited by [Zellic V12](https://zellic.ai/) AI scan — [report](./audit/zellic-V12-AI-scan/latest/core/0xBasti42_stabilityeth__main_64e4572_findings_2026-03-06-findings). No valid findings.
@@ -37,7 +41,3 @@ Audited by [Zellic V12](https://zellic.ai/) AI scan — [report](./audit/zellic-
 ## License
 
 See [LICENSE](./LICENSE) for more details.
-
-## Contact
-
-The primary security contact for StabilityETH is security@islalabs.co.
