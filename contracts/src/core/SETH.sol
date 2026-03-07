@@ -32,9 +32,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
     uint256 public accruedFees;
 
     /// @notice Minimum transfer amount to ensure fee-on-transfer always accrues exact ETH
-    /// @dev This is a non-arbitrary amount that is far below expected gas costs for making a single transfer, i.e. it is
-    ///      economically unfeasible to attempt a <=33,334 wei transaction that can cause excess ETH dust. Regardless,
-    ///      enforcing a minimum ensures the collateralization rate is protected in all conditions.
+    /// @dev This is a non-arbitrary amount that is far below expected gas costs for making a single transfer
     uint256 public constant MIN_TRANSFER_AMOUNT = 100_000;
 
     // --------------------------------------------
