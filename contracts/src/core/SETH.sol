@@ -32,7 +32,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
     uint256 public accruedFees;
 
     /// @notice Minimum transfer amount to ensure fee-on-transfer always accrues exact ETH
-    /// @dev This is a non-arbitrary amount that is far below expected gas costs for making a single transfer
+    /// @dev This is a non-arbitrary amount that is far below the gas cost of making a single transfer
     uint256 public constant MIN_TRANSFER_AMOUNT = 100_000;
 
     // --------------------------------------------
