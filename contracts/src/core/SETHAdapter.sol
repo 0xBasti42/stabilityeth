@@ -151,6 +151,8 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
 
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
+        uint256 rate = ISETH(SETH).EXCHANGE_RATE();
+        amountSentLD = (amountSentLD / rate) * rate; // Round down the excess (up to 99 wei) to maintain 1:100 collateralization
         bytes memory composeForQuote = abi.encode(uint256(0));
 
         (MessagingFee memory ethFee, MessagingFee memory sethFee, ) =
@@ -215,8 +217,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
 
         uint256 amountSentLD = _removeDust(_sendParam.amountLD);
         uint256 rate = ISETH(SETH).EXCHANGE_RATE();
-        // Round down to maintain 1:100 collateralization; dust stays with sender (up to 99 wei)
-        amountSentLD = (amountSentLD / rate) * rate;
+        amountSentLD = (amountSentLD / rate) * rate; // Round down the excess (up to 99 wei) to maintain 1:100 collateralization; dust stays with sender
         if (amountSentLD == 0) revert InvalidAmount();
         if (minTransferAmountLD > 0 && amountSentLD < minTransferAmountLD) revert AmountBelowMinimum();
 
@@ -227,7 +228,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         (MessagingFee memory ethFee, , uint256 amountReceivedLD) =
             _quoteSendFees(_sendParam, amountSentLD, transferIdPayload, dstAdapter, false);
 
-        amountReceivedLD = (amountReceivedLD / rate) * rate; // Round down; dust from fee subtraction not sent
+        amountReceivedLD = (amountReceivedLD / rate) * rate; // Round down the excess (up to 99 wei) to maintain 1:100 collateralization; dust stays with adapter
         if (amountReceivedLD < _sendParam.minAmountLD) revert IOFT.SlippageExceeded(amountReceivedLD, _sendParam.minAmountLD);
 
         _outflow(_sendParam.dstEid, amountSentLD);
@@ -302,8 +303,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         if (ethAmount == 0) return;
 
         uint256 rate = ISETH(SETH).EXCHANGE_RATE();
-        // Round down to maintain 1:100 collateralization; excess SETH (up to 99 wei) is not minted
-        uint256 amountToMint = (pm.amountLD / rate) * rate;
+        uint256 amountToMint = (pm.amountLD / rate) * rate; // Round down the excess (up to 99 wei) to maintain 1:100 collateralization; excess SETH is not minted
         uint256 expectedEthAmount = amountToMint / rate;
         if (ethAmount != expectedEthAmount) revert InvalidAmount();
 
@@ -359,8 +359,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         uint256 transferId = _creditTransferId;
         uint32 srcEid = _creditSrcEid;
         uint256 rate = ISETH(SETH).EXCHANGE_RATE();
-        // Round down to maintain 1:100 collateralization; excess SETH (up to 99 wei) is not minted
-        uint256 amountToMint = (_amountLD / rate) * rate;
+        uint256 amountToMint = (_amountLD / rate) * rate; // Round down the excess (up to 99 wei) to maintain 1:100 collateralization; excess SETH is not minted
         uint256 ethAmount = amountToMint / rate;
         uint256 queuedEthAmount = ethQueue[srcEid][transferId];
 
