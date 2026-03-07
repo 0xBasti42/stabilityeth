@@ -28,7 +28,7 @@ Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and st
 
 ## Security
 
-Audited by [Zellic V12](https://zellic.ai/) AI scan — [report](./audit/zellic-V12-AI-scan/latest/core/0xBasti42_stabilityeth__main_64e4572_findings_2026-03-06-findings). No valid findings.
+Audited by [Zellic V12](https://zellic.ai/) AI scan — [report](./contracts/audit/zellic-V12-AI-scan/latest/core/0xBasti42_stabilityeth__main_64e4572_findings_2026-03-06-findings). No valid findings.
 
 ## Disclaimer
 
