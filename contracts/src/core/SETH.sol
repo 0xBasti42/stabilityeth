@@ -3,7 +3,7 @@ pragma solidity ^0.8.34;
 
 import { ERC20 } from "@openzeppelin-v5/contracts/token/ERC20/ERC20.sol";
 import { ERC20Permit } from "@openzeppelin-v5/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import { ReentrancyGuard } from "@openzeppelin-v5/contracts/utils/ReentrancyGuard.sol";
+import { ReentrancyGuardTransient } from "@openzeppelin-v5/contracts/utils/ReentrancyGuardTransient.sol";
 
 /**
  * @title SETH | StabilityETH
@@ -12,7 +12,7 @@ import { ReentrancyGuard } from "@openzeppelin-v5/contracts/utils/ReentrancyGuar
  * @author Isla Labs (Tom Jarvis | 0xBasti42)
  * @custom:security-contact security@islalabs.co
  */
-contract SETH is ERC20, ERC20Permit, ReentrancyGuard {
+contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
     address public immutable SETH_ADAPTER;
 
     // --------------------------------------------
