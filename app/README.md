@@ -22,10 +22,10 @@ StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a ke
 
 SETH is fully collateralized by ETH at a 100:1 ratio (1 SETH = 0.01 ETH). Cross-chain transfers preserve this collateralization regardless of message arrival order. Verified applications receive Performance Based Returns in proportion to their share of total TVL, which does not rely on SETH holdings and instead can include any token staked in any contract, as long as the token has a market cap above $100m and the contract has a TVL above $100k.
 
-## Registration
+## Security
 
-Visit [StabilityETH](https://stability-eth.io/registry/) to verify a dApp and start earning Performance Based Returns (PBR). New EVM chains can be deployed automatically from the UI.
+Audited by [Zellic V12](https://zellic.ai/) AI scan — [report](../contracts/audit/zellic-V12-AI/latest/). No valid findings.
 
-## Contact
+## Disclaimer
 
-The primary security contact for StabilityETH is security@islalabs.co.
+*These smart contracts and testing suite are being provided as is. No guarantee, representation or warranty is being made, express or implied, as to the safety or correctness of anything provided herein or through related user interfaces. This repository and related code have not been audited and as such there can be no assurance anything will work as intended, and users may experience delays, failures, errors, omissions, loss of transmitted information or loss of funds. The creators are not liable for any of the foregoing. Users should proceed with caution and use at their own risk.*
