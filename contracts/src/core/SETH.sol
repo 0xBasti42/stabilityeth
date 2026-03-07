@@ -31,6 +31,12 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
     /// @notice Ringfenced account keeping for fee-on-transfer; collected lazily during PBR distribution
     uint256 public accruedFees;
 
+    /// @notice Minimum transfer amount to ensure fee-on-transfer always accrues exact ETH
+    /// @dev This is a non-arbitrary amount that is far below expected gas costs for making a single transfer, i.e. it is
+    ///      economically unfeasible to attempt a <=33,334 wei transaction that can cause excess ETH dust. Regardless,
+    ///      enforcing a minimum ensures the collateralization rate is protected in all conditions.
+    uint256 public constant MIN_TRANSFER_AMOUNT = 100_000;
+
     // --------------------------------------------
     //  Events & Errors
     // --------------------------------------------
@@ -40,6 +46,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
     error InvalidAddress();
     error Unauthorized();
     error EthTransferFailed();
+    error AmountBelowMinimum();
 
     // --------------------------------------------
     //  Access Control
@@ -143,6 +150,8 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuardTransient {
             super._update(from, to, value);
             return;
         }
+
+        if (value < MIN_TRANSFER_AMOUNT) revert AmountBelowMinimum();
 
         // Calculate fee
         uint256 fee = (value * TRANSFER_FEE_BPS) / BPS_DENOMINATOR;
