@@ -32,9 +32,8 @@ contract Orchestrator {
 	// ------------------------------------------
 
     event SafeUpdated(address indexed prev, address indexed next);
-    event NewChainAdded(uint32 indexed eid, uint64 chainId);
+    event NewChainAdded(uint32 indexed eid, address newSethAdapter);
     event NewAppAdded(address indexed deployerAddress, address beneficiaryAddress);
-    event SethAdapterAdded(uint32 indexed eid, address newSethAdapter);
     event PbrScriptUpdated(address indexed pbrManager);
 
     error ZeroAddress();
@@ -90,7 +89,7 @@ contract Orchestrator {
     /// @notice Add a new SETHAdapter for a destination chain
     function addSethAdapter(uint32 _eid, address _adapter, uint192 _limit, uint64 _window) external onlyMultisig {
         ISETHAdapterAdmin(SETH_ADAPTER).addSethAdapter(_eid, _adapter, _limit, _window);
-        emit SethAdapterAdded(_eid, _adapter);
+        emit NewChainAdded(_eid, _adapter);
     }
 
     /// @notice Set rate limits per destination chain
