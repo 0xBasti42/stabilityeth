@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
+import { RateLimiter } from "@layerzerolabs/oapp-evm/contracts/oapp/utils/RateLimiter.sol";
+
+interface ISETHAdapterAdmin {
+    function addSethAdapter(uint32 _eid, address _adapter, uint192 _limit, uint64 _window) external;
+    function setRateLimits(RateLimiter.RateLimitConfig[] calldata _rateLimitConfigs) external;
+    function resetRateLimits(uint32[] calldata _eids) external;
+    function pause() external;
+    function unpause() external;
+    function setMinTransferAmount(uint256 _min) external;
+}
+
 /**
  * @title Orchestrator
  * @notice Admin relay owned by Multisig; wraps privileged actions and predefines possible updates
@@ -72,11 +83,40 @@ contract Orchestrator {
 
 
 
-	// ------------------------------------------
+    // ------------------------------------------
 	//  SETHAdapter Admin
 	// ------------------------------------------
 
+    /// @notice Add a new SETHAdapter for a destination chain
+    function addSethAdapter(uint32 _eid, address _adapter, uint192 _limit, uint64 _window) external onlyMultisig {
+        ISETHAdapterAdmin(SETH_ADAPTER).addSethAdapter(_eid, _adapter, _limit, _window);
+        emit SethAdapterAdded(_eid, _adapter);
+    }
 
+    /// @notice Set rate limits per destination chain
+    function setSethAdapterRateLimits(RateLimiter.RateLimitConfig[] calldata _rateLimitConfigs) external onlyMultisig {
+        ISETHAdapterAdmin(SETH_ADAPTER).setRateLimits(_rateLimitConfigs);
+    }
+
+    /// @notice Reset rate limit in-flight amounts for given chains
+    function resetSethAdapterRateLimits(uint32[] calldata _eids) external onlyMultisig {
+        ISETHAdapterAdmin(SETH_ADAPTER).resetRateLimits(_eids);
+    }
+
+    /// @notice Pause outbound SETH sends
+    function pauseSethAdapter() external onlyMultisig {
+        ISETHAdapterAdmin(SETH_ADAPTER).pause();
+    }
+
+    /// @notice Unpause outbound SETH sends
+    function unpauseSethAdapter() external onlyMultisig {
+        ISETHAdapterAdmin(SETH_ADAPTER).unpause();
+    }
+
+    /// @notice Set minimum SETH transfer amount
+    function setSethAdapterMinTransferAmount(uint256 _min) external onlyMultisig {
+        ISETHAdapterAdmin(SETH_ADAPTER).setMinTransferAmount(_min);
+    }
 
     // ------------------------------------------
 	//  PBRManager Admin
