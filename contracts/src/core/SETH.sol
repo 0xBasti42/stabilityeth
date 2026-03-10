@@ -132,6 +132,9 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @dev Function restricted to SETHAdapter only; used for cross-chain sends. Debits msg.sender on srcChain and releases collateral.
      */
     function burn(address from, uint256 amount) external onlyAdapter returns (bool) {
+        if (amount < EXCHANGE_RATE) revert InvalidAmount();
+
+        amount = (amount / EXCHANGE_RATE) * EXCHANGE_RATE;
         uint256 ethAmount = amount / EXCHANGE_RATE;
         _burn(from, amount);
 
