@@ -147,6 +147,9 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @dev Function restricted to SETHAdapter only; used for cross-chain receives. Deposits collateral on dstChain and credits recipient.
      */
     function mint(address to, uint256 amount) external payable onlyAdapter returns (bool) {
+        if (amount < EXCHANGE_RATE) revert InvalidAmount();
+
+        amount = (amount / EXCHANGE_RATE) * EXCHANGE_RATE;
         uint256 expectedEth = amount / EXCHANGE_RATE;
         if (msg.value != expectedEth) revert InvalidAmount();
 
