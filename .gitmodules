@@ -4,3 +4,18 @@
 [submodule "contracts/lib/devtools"]
 	path = contracts/lib/devtools
 	url = https://github.com/layerzero-labs/devtools
+[submodule "contracts/lib/openzeppelin-contracts"]
+	path = contracts/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts/lib/chainlink-evm"]
+	path = contracts/lib/chainlink-evm
+	url = https://github.com/smartcontractkit/chainlink-evm
+[submodule "contracts/lib/LayerZero-v2"]
+	path = contracts/lib/LayerZero-v2
+	url = https://github.com/layerzero-labs/LayerZero-v2
+[submodule "contracts/lib/solidity-bytes-utils"]
+	path = contracts/lib/solidity-bytes-utils
+	url = https://github.com/GNSPS/solidity-bytes-utils
+[submodule "contracts/lib/prb-math"]
+	path = contracts/lib/prb-math
+	url = https://github.com/PaulRBerg/prb-math
