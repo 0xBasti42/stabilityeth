@@ -108,9 +108,9 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
     function withdraw(uint256 sethAmount) external nonReentrant {
         if (sethAmount < EXCHANGE_RATE) revert InvalidAmount();
 
-        // Round down to maintain 1:100 collateralization; dust stays with sender (up to 99 wei)
         uint256 amountToWithdraw = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
         uint256 ethAmount = amountToWithdraw / EXCHANGE_RATE;
+        
         uint256 feeBps = calculateDynamicFee(ethAmount);
         uint256 fee = (ethAmount * feeBps) / BPS_DENOMINATOR;
         uint256 amountOut = ethAmount - fee;
