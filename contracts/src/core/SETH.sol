@@ -10,7 +10,7 @@ import { DynamicFee } from "@core/base/DynamicFee.sol";
  * @title SETH | StabilityETH
  * @notice Omnichain SETH is minted and burned at a 100:1 ratio with ETH; provides Performance Based Returns (PBR) to verified applications
  * @dev Turns TVL into an additional source of revenue for verified applications | https://stability-eth.io/registry/
- * @dev Inherits DynamicFee for tiered exponential decay fee calculation based on transaction volume
+ * @dev Inherits DynamicFee for proprietary fee calculation which uses tiered exponential decay to determine feeBps output for volumeEth input
  * @author Isla Labs (Tom Jarvis | 0xBasti42)
  * @custom:security-contact security@islalabs.co
  */
