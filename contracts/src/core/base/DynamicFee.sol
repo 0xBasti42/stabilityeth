@@ -21,7 +21,7 @@ abstract contract DynamicFee {
     /// @notice Maximum age of Chainlink price data
     uint256 internal constant MAX_ORACLE_AGE = 1 days;
 
-    /// @notice Fallback ETH-USD price for testnet and feed failure/staleness (rare)
+    /// @notice Fallback ETH-USD price for testnets and for mainnet feed staleness/failure (rare)
     /// @dev In the unlikely event of Chainlink price feed failure on mainnets, FALLBACK_ETH_PRICE may return inaccurate values but transactions
     ///      will still be processed
     uint256 public immutable FALLBACK_ETH_PRICE;
