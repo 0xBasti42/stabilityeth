@@ -2,5 +2,43 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+evm_version = "cancun"
+via_ir = true
+solc = "0.8.34"
+optimizer = true
+optimizer_runs = 0
+bytecode_hash = "none"
+gas_limit = "8000000000"
+create2_deployer = "0x4e59b44847b379578588920ca78fbf26c0b4956c"
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+fs_permissions = [
+  { access = "read", path = "./lib" },
+  { access = "read", path = "./script" },
+  { access = "write", path = "./deployments" },
+]
+
+[fuzz]
+max_test_rejects = 10000000
+runs = 32
+depth = 512
+
+[fmt]
+bracket_spacing = true
+int_types = "long"
+line_length = 120
+multiline_func_header = "params_first"
+number_underscore = "thousands"
+quote_style = "double"
+tab_width = 4
+wrap_comments = false
+
+[invariant]
+show_metrics = true
+fail_on_revert = true
+
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}" }
+
+[rpc_endpoints]
+base = "${BASE_MAINNET_RPC_URL}"
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
