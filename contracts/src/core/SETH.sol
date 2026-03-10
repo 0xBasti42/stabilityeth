@@ -85,6 +85,8 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @dev Dynamic fee on deposit is accrued for PBR based on transaction volume; cross-chain mints via adapter have no fee
      */
     function deposit() public payable {
+        if (msg.value == 0) revert InvalidAmount();
+
         uint256 feeBps = calculateDynamicFee(msg.value);
         uint256 fee = (msg.value * feeBps) / BPS_DENOMINATOR;
         uint256 amountIn = msg.value - fee;
@@ -104,6 +106,8 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @dev Rounds down to nearest multiple of EXCHANGE_RATE; dust stays with caller. Dynamic fee on withdraw is accrued for PBR.
      */
     function withdraw(uint256 sethAmount) external nonReentrant {
+        if (sethAmount < EXCHANGE_RATE) revert InvalidAmount();
+
         // Round down to maintain 1:100 collateralization; dust stays with sender (up to 99 wei)
         uint256 amountToWithdraw = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
         uint256 ethAmount = amountToWithdraw / EXCHANGE_RATE;
@@ -131,17 +135,17 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @notice Burns SETH from account and releases ETH collateral to caller (SETHAdapter)
      * @dev Function restricted to SETHAdapter only; used for cross-chain sends. Debits msg.sender on srcChain and releases collateral.
      */
-    function burn(address from, uint256 amount) external onlyAdapter returns (bool) {
-        if (amount < EXCHANGE_RATE) revert InvalidAmount();
+    function burn(address from, uint256 sethAmount) external onlyAdapter returns (bool) {
+        if (sethAmount < EXCHANGE_RATE) revert InvalidAmount();
 
-        amount = (amount / EXCHANGE_RATE) * EXCHANGE_RATE;
-        uint256 ethAmount = amount / EXCHANGE_RATE;
-        _burn(from, amount);
+        sethAmount = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
+        uint256 ethAmount = sethAmount / EXCHANGE_RATE;
+        _burn(from, sethAmount);
 
         (bool success, ) = msg.sender.call{value: ethAmount}("");
         if (!success) revert EthTransferFailed();
 
-        emit BridgedOut(from, amount, ethAmount);
+        emit BridgedOut(from, sethAmount, ethAmount);
         return true;
     }
 
@@ -149,16 +153,16 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @notice Receives ETH collateral and mints SETH to account (SETHAdapter)
      * @dev Function restricted to SETHAdapter only; used for cross-chain receives. Deposits collateral on dstChain and credits recipient.
      */
-    function mint(address to, uint256 amount) external payable onlyAdapter returns (bool) {
-        if (amount < EXCHANGE_RATE) revert InvalidAmount();
+    function mint(address to, uint256 sethAmount) external payable onlyAdapter returns (bool) {
+        if (sethAmount < EXCHANGE_RATE) revert InvalidAmount();
 
-        amount = (amount / EXCHANGE_RATE) * EXCHANGE_RATE;
-        uint256 expectedEth = amount / EXCHANGE_RATE;
+        sethAmount = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
+        uint256 expectedEth = sethAmount / EXCHANGE_RATE;
         if (msg.value != expectedEth) revert InvalidAmount();
 
-        _mint(to, amount);
+        _mint(to, sethAmount);
 
-        emit BridgedIn(to, amount, expectedEth);
+        emit BridgedIn(to, sethAmount, expectedEth);
         return true;
     }
 
