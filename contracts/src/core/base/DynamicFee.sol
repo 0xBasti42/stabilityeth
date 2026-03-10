@@ -18,7 +18,12 @@ abstract contract DynamicFee {
     /// @notice Feed decimals for CHAINLINK_ETH_USD
     uint8 public immutable FEED_DECIMALS;
 
-    /// @notice Fallback ETH-USD price for testnet
+    /// @notice Maximum age of Chainlink price data
+    uint256 internal constant MAX_ORACLE_AGE = 1 days;
+
+    /// @notice Fallback ETH-USD price for testnet and feed failure/staleness (rare)
+    /// @dev In the unlikely event of Chainlink price feed failure on mainnets, FALLBACK_ETH_PRICE may return inaccurate values but transactions
+    ///      will still be processed
     uint256 public immutable FALLBACK_ETH_PRICE;
 
     // ------------------------------------------
@@ -28,19 +33,19 @@ abstract contract DynamicFee {
     uint256 internal constant FEE_MIN_BPS = 100; // should be 060 for 0.60%
 
     uint256 internal constant FEE_START_TIER_1 = 500; // should be 200 for 2.00%
-    uint256 internal constant FEE_START_TIER_2 = 481;
-    uint256 internal constant FEE_START_TIER_3 = 322;
-    uint256 internal constant FEE_START_TIER_4 = 123;
+    uint256 internal constant FEE_START_TIER_2 = 481; // need to calculate
+    uint256 internal constant FEE_START_TIER_3 = 322; // need to calculate
+    uint256 internal constant FEE_START_TIER_4 = 123; // need to calculate
 
-    uint256 internal constant ALPHA_TIER_1 = 100;
-    uint256 internal constant ALPHA_TIER_2 = 120;
-    uint256 internal constant ALPHA_TIER_3 = 50;
-    uint256 internal constant ALPHA_TIER_4 = 100;
+    uint256 internal constant ALPHA_TIER_1 = 100; // can potentially stay - test
+    uint256 internal constant ALPHA_TIER_2 = 120; // can potentially stay - test
+    uint256 internal constant ALPHA_TIER_3 = 50; // can potentially stay - test
+    uint256 internal constant ALPHA_TIER_4 = 100; // can potentially stay - test
 
     uint256 internal constant TIER_1_THRESHOLD_USD = 0;
-    uint256 internal constant TIER_2_THRESHOLD_USD = 500;
-    uint256 internal constant TIER_3_THRESHOLD_USD = 5000;
-    uint256 internal constant TIER_4_THRESHOLD_USD = 50000;
+    uint256 internal constant TIER_2_THRESHOLD_USD = 25000;
+    uint256 internal constant TIER_3_THRESHOLD_USD = 250000;
+    uint256 internal constant TIER_4_THRESHOLD_USD = 2500000;
 
     uint256 internal constant SCALE_PARAMETER = 1000;
 
@@ -144,6 +149,9 @@ abstract contract DynamicFee {
             returns (uint80 roundId, int256 answer, uint256 /* startedAt */, uint256 updatedAt, uint80 answeredInRound)
         {
             if (answer > 0 && updatedAt != 0 && answeredInRound >= roundId) {
+                if (block.timestamp < updatedAt || block.timestamp - updatedAt > MAX_ORACLE_AGE) {
+                    return FALLBACK_ETH_PRICE;
+                }
                 uint8 dec = FEED_DECIMALS;
                 if (dec >= 6) {
                     uint256 factor = 10 ** (uint256(dec) - 6);
