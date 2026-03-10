@@ -2,11 +2,11 @@
 pragma solidity ^0.8.34;
 
 /**
- * ## Formula
+ * ─── Formula ───────────────────────────────────────────────────
  *
  *     ϕ(v) = f_min + (ϕ_start - f_min) ⋅ e^(−α ⋅ (v−v_start) / κ)
  *
- * ## Variables
+ * ─── Variables ─────────────────────────────────────────────────
  *
  * - ϕ: The calculated fee rate (output, in basis points)
  * - v: Transaction volume (input, in USD; derived from ETH volume via Chainlink price)
@@ -17,7 +17,7 @@ pragma solidity ^0.8.34;
  * - e: Euler's number
  * - κ: Scale parameter (1000)
  *
- * ## Design
+ * ─── Design ────────────────────────────────────────────────────
  *
  * The fee rate decays exponentially as transaction volume increases. This decay happens within four
  * predefined tiers (v_start) that each have their own decay factor (α) and stepwise function (ϕ_start).
@@ -25,16 +25,17 @@ pragma solidity ^0.8.34;
  * Each tier's variables (v_start, ϕ_start, α) are predefined; f_min, e, and κ are constants. The only
  * variable input is transaction volume (v) for calculating the final fee rate (ϕ) output.
  *
- * ## Fee Bounds
+ * ─── Fee Bounds ────────────────────────────────────────────────
  *
  * - Maximum: 2.00% for low volume transactions
  * - Minimum: 0.60% for high volume transactions
  * - Scale parameter κ: always 1000
  *
- * ## Tiers
+ * ─── Tiers ─────────────────────────────────────────────────────
  *
  * Four tiers apply at different volume thresholds ($0, $25k, $250k, $2.5M), converted to USD to keep tiers
  * stable. Each tier's decay factor (α) determines how quickly the fee rate declines as volume increases.
+ *
  */
 
 import { AggregatorV3Interface } from "@core/base/interfaces/AggregatorV3Interface.sol";
