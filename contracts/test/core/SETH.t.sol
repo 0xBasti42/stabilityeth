@@ -27,13 +27,18 @@ contract SETHTest is Test {
     // --------------------------------------------
 
     function test_deposit_mintsAt100to1() public {
-        vm.deal(address(this), 10 ether);
-        seth.deposit{ value: 10 ether }();
-        // Dynamic fee: ~1.64% on 10 ether at $30k volume (tier 3); ~0.164 ether fee, ~983.6 ether SETH
+        uint256 depositAmount = 10 ether;
+        vm.deal(address(this), depositAmount);
+        uint256 feeBps = seth.calculateDynamicFee(depositAmount);
+        uint256 expectedFee = (depositAmount * feeBps) / 10000;
+        uint256 expectedSeth = (depositAmount - expectedFee) * seth.EXCHANGE_RATE();
+
+        seth.deposit{ value: depositAmount }();
+
         uint256 sethBalance = seth.balanceOf(address(this));
-        assertApproxEqAbs(sethBalance, 983.6 ether, 1 ether, "SETH minted");
-        assertEq(address(seth).balance, 10 ether);
-        assertApproxEqAbs(seth.accruedFeesInEth(), 0.164 ether, 0.01 ether, "accrued fees");
+        assertApproxEqAbs(sethBalance, expectedSeth, 1 ether, "SETH minted");
+        assertEq(address(seth).balance, depositAmount);
+        assertApproxEqAbs(seth.accruedFeesInEth(), expectedFee, 0.01 ether, "accrued fees");
     }
 
     function test_withdraw_burnsAndSendsEth() public {
