@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.34;
+
 /**
  * ## Formula
  *
@@ -33,9 +36,6 @@
  * Four tiers apply at different volume thresholds ($0, $25k, $250k, $2.5M), converted to USD to keep tiers
  * stable. Each tier's decay factor (α) determines how quickly the fee rate declines as volume increases.
  */
-
-// SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.34;
 
 import { AggregatorV3Interface } from "@core/base/interfaces/AggregatorV3Interface.sol";
 import { SD59x18, exp, sd } from "@prb-math/src/SD59x18.sol";
