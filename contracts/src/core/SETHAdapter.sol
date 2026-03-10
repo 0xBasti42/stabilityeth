@@ -16,8 +16,8 @@ import { Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppReceiver.sol"
 
 interface ISETH {
     function EXCHANGE_RATE() external view returns (uint256);
-    function mint(address to, uint256 amount) external payable returns (bool);
-    function burn(address from, uint256 amount) external returns (bool);
+    function mint(address to, uint256 sethAmount) external payable returns (bool);
+    function burn(address from, uint256 sethAmount) external returns (bool);
 }
 
 /**
