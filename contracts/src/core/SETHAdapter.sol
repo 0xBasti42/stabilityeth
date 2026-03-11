@@ -28,9 +28,10 @@ interface ISETH {
 
 /**
  * @title SETHAdapter | StabilityETH
+ * @author Isla Labs (Tom Jarvis | 0xBasti42)
  * @notice LayerZero OFT wrapper for SETH which handles cross-chain collateral flows.
  * @dev Uses (srcEid, transferId) composite key to match ETH and SETH messages; only mints when ETH has arrived.
- * @author Isla Labs (Tom Jarvis | 0xBasti42)
+ * @custom:experimental Turning TVL into an additional source of revenue for verified dApps | https://stability-eth.io/registry/
  * @custom:security-contact security@islalabs.co
  */
 contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGuard, ILayerZeroComposer {
