@@ -42,9 +42,11 @@ import { AggregatorV3Interface } from "@core/base/interfaces/AggregatorV3Interfa
 import { SD59x18, exp, sd } from "@prb-math/src/SD59x18.sol";
 
 /**
- * @title DynamicFee with Chainlink integration to enable stable fee tiers
- * @notice Dynamic fee uses tiered exponential decay with configurable parameters to output a variable fee rate at different transaction volumes
+ * @title DynamicFee | StabilityETH
  * @author Isla Labs (Tom Jarvis | 0xBasti42)
+ * @notice Dynamic fee with tiered exponential decay, customizable constants and simple API
+ * @dev Integrated with Chainlink to enable stable fee tiers (denominated in USD), and with prb-math for computing the exponential term
+ * @custom:experimental Turning TVL into an additional source of revenue for verified dApps | https://stability-eth.io/registry/
  * @custom:security-contact security@islalabs.co
  */
 abstract contract DynamicFee {
