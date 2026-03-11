@@ -30,7 +30,7 @@ contract SETHTest is Test {
         uint256 depositAmount = 10 ether;
         vm.deal(address(this), depositAmount);
         uint256 feeBps = seth.calculateDynamicFee(depositAmount);
-        uint256 expectedFee = (depositAmount * feeBps) / 10000;
+        uint256 expectedFee = (depositAmount * feeBps) / 10_000;
         uint256 expectedSeth = (depositAmount - expectedFee) * seth.EXCHANGE_RATE();
 
         seth.deposit{ value: depositAmount }();
@@ -70,7 +70,7 @@ contract SETHTest is Test {
         require(seth.transfer(recipient, 100 ether), "transfer failed");
         (bool fullyBacked, uint256 ratioBps) = seth.isFullyBacked();
         assertTrue(fullyBacked);
-        assertGe(ratioBps, 10000);
+        assertGe(ratioBps, 10_000);
     }
 
     function test_ethCollateral_excludesAccruedFees() public {

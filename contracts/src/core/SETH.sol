@@ -25,7 +25,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
     uint256 public constant EXCHANGE_RATE = 100;
 
     /// @notice Standardized basis points denominator
-    uint256 private constant BPS_DENOMINATOR = 10000;
+    uint256 private constant BPS_DENOMINATOR = 10_000;
 
     /// @notice Ringfenced account keeping for PBR fees; collected lazily during PBR distribution
     uint256 public accruedFees;
@@ -60,11 +60,10 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
     //  Initialization
     // --------------------------------------------
 
-    constructor(address _sethAdapter, address _chainlinkEthUsd)
-        ERC20("StabilityETH", "SETH")
-        ERC20Permit("StabilityETH")
-        DynamicFee(_chainlinkEthUsd)
-    {
+    constructor(
+        address _sethAdapter,
+        address _chainlinkEthUsd
+    ) ERC20("StabilityETH", "SETH") ERC20Permit("StabilityETH") DynamicFee(_chainlinkEthUsd) {
         if (_sethAdapter == address(0)) revert InvalidAddress();
         SETH_ADAPTER = _sethAdapter;
     }
@@ -105,12 +104,14 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @notice Burns SETH and withdraws ETH at 100:1 ratio
      * @dev Rounds down to nearest multiple of EXCHANGE_RATE; dust stays with caller. Dynamic fee on withdraw is accrued for PBR.
      */
-    function withdraw(uint256 sethAmount) external nonReentrant {
+    function withdraw(
+        uint256 sethAmount
+    ) external nonReentrant {
         if (sethAmount < EXCHANGE_RATE) revert InvalidAmount();
 
         uint256 amountToWithdraw = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
         uint256 ethAmount = amountToWithdraw / EXCHANGE_RATE;
-        
+
         uint256 feeBps = calculateDynamicFee(ethAmount);
         uint256 fee = (ethAmount * feeBps) / BPS_DENOMINATOR;
         uint256 amountOut = ethAmount - fee;
@@ -118,7 +119,7 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
         accruedFees += fee;
         _burn(msg.sender, amountToWithdraw);
 
-        (bool success, ) = msg.sender.call{value: amountOut}("");
+        (bool success,) = msg.sender.call{ value: amountOut }("");
         if (!success) revert EthTransferFailed();
 
         if (fee > 0) {
@@ -135,14 +136,17 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @notice Burns SETH from account and releases ETH collateral to caller (SETHAdapter)
      * @dev Function restricted to SETHAdapter only; used for cross-chain sends. Debits msg.sender on srcChain and releases collateral.
      */
-    function burn(address from, uint256 sethAmount) external onlyAdapter returns (bool) {
+    function burn(
+        address from,
+        uint256 sethAmount
+    ) external onlyAdapter returns (bool) {
         if (sethAmount < EXCHANGE_RATE) revert InvalidAmount();
 
         sethAmount = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
         uint256 ethAmount = sethAmount / EXCHANGE_RATE;
         _burn(from, sethAmount);
 
-        (bool success, ) = msg.sender.call{value: ethAmount}("");
+        (bool success,) = msg.sender.call{ value: ethAmount }("");
         if (!success) revert EthTransferFailed();
 
         emit BridgedOut(from, sethAmount, ethAmount);
@@ -153,7 +157,10 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
      * @notice Receives ETH collateral and mints SETH to account (SETHAdapter)
      * @dev Function restricted to SETHAdapter only; used for cross-chain receives. Deposits collateral on dstChain and credits recipient.
      */
-    function mint(address to, uint256 sethAmount) external payable onlyAdapter returns (bool) {
+    function mint(
+        address to,
+        uint256 sethAmount
+    ) external payable onlyAdapter returns (bool) {
         if (sethAmount < EXCHANGE_RATE) revert InvalidAmount();
 
         sethAmount = (sethAmount / EXCHANGE_RATE) * EXCHANGE_RATE;
@@ -196,13 +203,13 @@ contract SETH is ERC20, ERC20Permit, ReentrancyGuard, DynamicFee {
     /// @dev Uses ethCollateral() (balance minus accrued fees) so fee liabilities are excluded from backing
     function isFullyBacked() external view returns (bool fullyBacked, uint256 collateralRatioBps) {
         uint256 supply = totalSupply();
-        
+
         if (supply == 0) {
             return (true, BPS_DENOMINATOR); // 100% backed if no supply
         }
-        
+
         uint256 collateral = address(this).balance - accruedFees;
-        
+
         collateralRatioBps = (collateral * EXCHANGE_RATE * BPS_DENOMINATOR) / supply;
         fullyBacked = collateralRatioBps >= BPS_DENOMINATOR;
     }

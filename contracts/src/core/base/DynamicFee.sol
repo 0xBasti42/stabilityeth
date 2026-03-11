@@ -79,9 +79,9 @@ abstract contract DynamicFee {
     uint256 internal constant ALPHA_TIER_4 = 100; // can potentially stay - test
 
     uint256 internal constant TIER_1_THRESHOLD_USD = 0;
-    uint256 internal constant TIER_2_THRESHOLD_USD = 25000;
-    uint256 internal constant TIER_3_THRESHOLD_USD = 250000;
-    uint256 internal constant TIER_4_THRESHOLD_USD = 2500000;
+    uint256 internal constant TIER_2_THRESHOLD_USD = 25_000;
+    uint256 internal constant TIER_3_THRESHOLD_USD = 250_000;
+    uint256 internal constant TIER_4_THRESHOLD_USD = 2_500_000;
 
     uint256 internal constant SCALE_PARAMETER = 1000;
 
@@ -89,15 +89,17 @@ abstract contract DynamicFee {
     //  Initialization
     // ------------------------------------------
 
-    constructor(address _chainlinkEthUsd) {
+    constructor(
+        address _chainlinkEthUsd
+    ) {
         CHAINLINK_ETH_USD = _chainlinkEthUsd;
-        FALLBACK_ETH_PRICE = 3000000000; // 6 decimals
+        FALLBACK_ETH_PRICE = 3_000_000_000; // 6 decimals
 
         uint8 _dec = 8;
         if (CHAINLINK_ETH_USD != address(0)) {
             try AggregatorV3Interface(CHAINLINK_ETH_USD).decimals() returns (uint8 d) {
                 _dec = d;
-            } catch {}
+            } catch { }
         }
         FEED_DECIMALS = _dec;
     }
@@ -111,7 +113,9 @@ abstract contract DynamicFee {
      * @param volumeEth Volume in ETH (wei)
      * @return feeBps Fee in basis points
      */
-    function calculateDynamicFee(uint256 volumeEth) public view returns (uint256 feeBps) {
+    function calculateDynamicFee(
+        uint256 volumeEth
+    ) public view returns (uint256 feeBps) {
         // Fetch ETH price
         uint256 ethPriceUsd = _ethPriceUsd();
 
@@ -149,7 +153,9 @@ abstract contract DynamicFee {
      * @return vStartUsd Starting volume threshold for fee tier
      * @return feeStart Precomputed fee (bps) at v_start for fee tier
      */
-    function _getTierParameters(uint256 volumeUsd) internal pure returns (uint256 alpha, uint256 vStartUsd, uint256 feeStart) {
+    function _getTierParameters(
+        uint256 volumeUsd
+    ) internal pure returns (uint256 alpha, uint256 vStartUsd, uint256 feeStart) {
         if (volumeUsd <= TIER_2_THRESHOLD_USD) return (ALPHA_TIER_1, TIER_1_THRESHOLD_USD, FEE_START_TIER_1);
         if (volumeUsd <= TIER_3_THRESHOLD_USD) return (ALPHA_TIER_2, TIER_2_THRESHOLD_USD, FEE_START_TIER_2);
         if (volumeUsd <= TIER_4_THRESHOLD_USD) return (ALPHA_TIER_3, TIER_3_THRESHOLD_USD, FEE_START_TIER_3);
@@ -157,14 +163,16 @@ abstract contract DynamicFee {
     }
 
     /**
-	 * @notice Calculate e^(-x/1000) with 18-decimal precision
+     * @notice Calculate e^(-x/1000) with 18-decimal precision
      * @dev Uses PRBMath SD59x18 to evaluate exp on the signed fixed-point input -x/1000
-	 * @param x Unscaled exponent input
+     * @param x Unscaled exponent input
      * @return value The 1e18-scaled result of e^(-x/1000)
      */
-    function _calculateExponentialDecay(uint256 x) internal pure returns (uint256 value) {
+    function _calculateExponentialDecay(
+        uint256 x
+    ) internal pure returns (uint256 value) {
         if (x == 0) return 1 ether; // e^0 = 1
-        if (x >= 10000) return 0;   // e^(-10) ≈ 0 (clamp for extreme values)
+        if (x >= 10_000) return 0; // e^(-10) ≈ 0 (clamp for extreme values)
 
         // Convert to signed fixed-point and compute e^(-x/1000)
         SD59x18 negativeX = sd(-int256(x)) / sd(1000);
@@ -181,9 +189,9 @@ abstract contract DynamicFee {
     function _ethPriceUsd() internal view returns (uint256 ethPriceUsd) {
         if (CHAINLINK_ETH_USD == address(0)) return FALLBACK_ETH_PRICE;
 
-        try AggregatorV3Interface(CHAINLINK_ETH_USD).latestRoundData()
-            returns (uint80 roundId, int256 answer, uint256 /* startedAt */, uint256 updatedAt, uint80 answeredInRound)
-        {
+        try AggregatorV3Interface(CHAINLINK_ETH_USD).latestRoundData() returns (
+            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 updatedAt, uint80 answeredInRound
+        ) {
             if (answer > 0 && updatedAt != 0 && answeredInRound >= roundId) {
                 if (block.timestamp < updatedAt || block.timestamp - updatedAt > MAX_ORACLE_AGE) {
                     return FALLBACK_ETH_PRICE;
@@ -197,7 +205,7 @@ abstract contract DynamicFee {
                     return uint256(answer) * factor;
                 }
             }
-        } catch {}
+        } catch { }
 
         return FALLBACK_ETH_PRICE;
     }

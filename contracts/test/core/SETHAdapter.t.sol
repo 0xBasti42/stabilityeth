@@ -16,13 +16,17 @@ import { Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppReceiver.sol"
 contract EndpointMock {
     mapping(address => address) public delegates;
 
-    function setDelegate(address _delegate) external {
+    function setDelegate(
+        address _delegate
+    ) external {
         delegates[msg.sender] = _delegate;
     }
 }
 
 contract EthOFTMock {
-    function sendEth(address adapter) external payable {
+    function sendEth(
+        address adapter
+    ) external payable {
         (bool ok,) = adapter.call{ value: msg.value }("");
         require(ok, "send failed");
     }
@@ -161,22 +165,34 @@ contract SETHAdapterAmountBindingTest is Test {
         assertEq(address(seth).balance, 10 ether);
     }
 
-    function _buildComposeMessage(uint32 srcEid, uint256 amountLD, uint256 transferId) internal view returns (bytes memory) {
+    function _buildComposeMessage(
+        uint32 srcEid,
+        uint256 amountLD,
+        uint256 transferId
+    ) internal view returns (bytes memory) {
         bytes memory composeMsg = abi.encodePacked(bytes32(uint256(uint160(address(this)))), abi.encode(transferId));
         return OFTComposeMsgCodec.encode(1, srcEid, amountLD, composeMsg);
     }
 
-    function _buildOftMessage(address to, uint64 amountSD, uint256 transferId) internal view returns (bytes memory) {
+    function _buildOftMessage(
+        address to,
+        uint64 amountSD,
+        uint256 transferId
+    ) internal view returns (bytes memory) {
         (bytes memory message,) = OFTMsgCodec.encode(bytes32(uint256(uint160(to))), amountSD, abi.encode(transferId));
         return message;
     }
 
-    function _computeCreateAddress(address deployer, uint256 nonce) internal pure returns (address) {
+    function _computeCreateAddress(
+        address deployer,
+        uint256 nonce
+    ) internal pure returns (address) {
         require(nonce <= 0x7f, "nonce too large");
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, uint8(nonce)));
         return address(uint160(uint256(hash)));
     }
 }
+
 // forge-lint: disable-end(unsafe-typecast, mixed-case-variable)
 
 // --------------------------------------------
@@ -239,12 +255,19 @@ contract SETHAdapterAccessControlTest is Test {
         adapter.lzReceive(origin, bytes32("x"), message, address(0), "");
     }
 
-    function _buildComposeMessage(uint32 srcEid, uint256 amountLD, uint256 transferId) internal view returns (bytes memory) {
+    function _buildComposeMessage(
+        uint32 srcEid,
+        uint256 amountLD,
+        uint256 transferId
+    ) internal view returns (bytes memory) {
         bytes memory composeMsg = abi.encodePacked(bytes32(uint256(uint160(address(this)))), abi.encode(transferId));
         return OFTComposeMsgCodec.encode(1, srcEid, amountLD, composeMsg);
     }
 
-    function _computeCreateAddress(address deployer, uint256 nonce) internal pure returns (address) {
+    function _computeCreateAddress(
+        address deployer,
+        uint256 nonce
+    ) internal pure returns (address) {
         require(nonce <= 0x7f, "nonce too large");
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, uint8(nonce)));
         return address(uint160(uint256(hash)));
@@ -406,7 +429,10 @@ contract SETHAdapterAddSethAdapterTest is Test {
         adapter.addSethAdapters(eids, adapters, limits, windows);
     }
 
-    function _computeCreateAddress(address deployer, uint256 nonce) internal pure returns (address) {
+    function _computeCreateAddress(
+        address deployer,
+        uint256 nonce
+    ) internal pure returns (address) {
         require(nonce <= 0x7f, "nonce too large");
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, uint8(nonce)));
         return address(uint160(uint256(hash)));
@@ -464,7 +490,10 @@ contract SETHAdapterQuoteSendTest is Test {
         adapter.quoteSend(param, false);
     }
 
-    function _computeCreateAddress(address deployer, uint256 nonce) internal pure returns (address) {
+    function _computeCreateAddress(
+        address deployer,
+        uint256 nonce
+    ) internal pure returns (address) {
         require(nonce <= 0x7f, "nonce too large");
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, uint8(nonce)));
         return address(uint160(uint256(hash)));
@@ -536,7 +565,10 @@ contract SETHAdapterSendTest is Test {
         adapter.send{ value: 0 }(param, MessagingFee(0, 0), address(this));
     }
 
-    function _computeCreateAddress(address deployer, uint256 nonce) internal pure returns (address) {
+    function _computeCreateAddress(
+        address deployer,
+        uint256 nonce
+    ) internal pure returns (address) {
         require(nonce <= 0x7f, "nonce too large");
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, uint8(nonce)));
         return address(uint160(uint256(hash)));
@@ -579,7 +611,10 @@ contract SETHAdapterAdminTest is Test {
         adapter.setMinTransferAmount(1 ether);
     }
 
-    function _computeCreateAddress(address deployer, uint256 nonce) internal pure returns (address) {
+    function _computeCreateAddress(
+        address deployer,
+        uint256 nonce
+    ) internal pure returns (address) {
         require(nonce <= 0x7f, "nonce too large");
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, uint8(nonce)));
         return address(uint160(uint256(hash)));

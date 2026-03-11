@@ -16,8 +16,14 @@ import { Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppReceiver.sol"
 
 interface ISETH {
     function EXCHANGE_RATE() external view returns (uint256);
-    function mint(address to, uint256 sethAmount) external payable returns (bool);
-    function burn(address from, uint256 sethAmount) external returns (bool);
+    function mint(
+        address to,
+        uint256 sethAmount
+    ) external payable returns (bool);
+    function burn(
+        address from,
+        uint256 sethAmount
+    ) external returns (bool);
 }
 
 /**
@@ -161,11 +167,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
             _setPeer(_eids[i], _addressToBytes32(_adapters[i]));
             emit NewChainAdded(_eids[i], _adapters[i]);
 
-            configs[i] = RateLimiter.RateLimitConfig({
-                dstEid: _eids[i],
-                limit: _limits[i],
-                window: _windows[i]
-            });
+            configs[i] = RateLimiter.RateLimitConfig({ dstEid: _eids[i], limit: _limits[i], window: _windows[i] });
         }
 
         _setRateLimits(configs);
@@ -179,7 +181,10 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
      * @notice Returns combined LayerZero fee (SETH message + ETH collateral bridge)
      * @dev Read only. Actual fee is deducted automatically from _send since ETH collateral is being moved by default.
      */
-    function quoteSend(SendParam calldata _sendParam, bool _payInLzToken) external view override returns (MessagingFee memory) {
+    function quoteSend(
+        SendParam calldata _sendParam,
+        bool _payInLzToken
+    ) external view override returns (MessagingFee memory) {
         if (_sendParam.to == bytes32(0)) revert InvalidRecipient();
         address dstAdapter = sethAdapters[_sendParam.dstEid];
         if (dstAdapter == address(0)) revert SethAdapterNotSet(_sendParam.dstEid);
@@ -189,10 +194,12 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         amountSentLD = (amountSentLD / rate) * rate;
         bytes memory composeForQuote = abi.encode(uint256(0));
 
-        (MessagingFee memory ethFee, MessagingFee memory sethFee, ) =
+        (MessagingFee memory ethFee, MessagingFee memory sethFee,) =
             _quoteSendFees(_sendParam, amountSentLD, composeForQuote, dstAdapter, _payInLzToken);
 
-        return MessagingFee({ nativeFee: sethFee.nativeFee + ethFee.nativeFee, lzTokenFee: sethFee.lzTokenFee + ethFee.lzTokenFee });
+        return MessagingFee({
+            nativeFee: sethFee.nativeFee + ethFee.nativeFee, lzTokenFee: sethFee.lzTokenFee + ethFee.lzTokenFee
+        });
     }
 
     /**
@@ -241,7 +248,8 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
 
     function _send(
         SendParam calldata _sendParam,
-        MessagingFee calldata /* _fee */,
+        MessagingFee calldata,
+        /* _fee */
         address _refundAddress
     ) internal virtual override returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt) {
         if (_sendParam.to == bytes32(0)) revert InvalidRecipient();
@@ -259,11 +267,13 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         bytes memory transferIdPayload = abi.encode(transferId);
 
         // ─── Phase 1: Quote ─────────────────────────────────────────────────────
-        (MessagingFee memory ethFee, , uint256 amountReceivedLD) =
+        (MessagingFee memory ethFee,, uint256 amountReceivedLD) =
             _quoteSendFees(_sendParam, amountSentLD, transferIdPayload, dstAdapter, false);
 
         amountReceivedLD = (amountReceivedLD / rate) * rate;
-        if (amountReceivedLD < _sendParam.minAmountLD) revert IOFT.SlippageExceeded(amountReceivedLD, _sendParam.minAmountLD);
+        if (amountReceivedLD < _sendParam.minAmountLD) {
+            revert IOFT.SlippageExceeded(amountReceivedLD, _sendParam.minAmountLD);
+        }
 
         _outflow(_sendParam.dstEid, amountSentLD);
 
@@ -272,10 +282,11 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
 
         uint256 ethAmount = amountReceivedLD / ISETH(SETH).EXCHANGE_RATE();
         SendParam memory ethParam = _buildEthSendParam(_sendParam, dstAdapter, ethAmount, transferIdPayload);
-        IOFT(ETH_OFT).send{value: ethAmount + ethFee.nativeFee}(ethParam, ethFee, _refundAddress);
+        IOFT(ETH_OFT).send{ value: ethAmount + ethFee.nativeFee }(ethParam, ethFee, _refundAddress);
 
         SendParam memory sethParam = _buildSethSendParam(_sendParam, amountReceivedLD, transferIdPayload);
-        (bytes memory message, bytes memory options) = _buildMsgAndOptionsMemory(sethParam, amountReceivedLD, _sendParam.extraOptions);
+        (bytes memory message, bytes memory options) =
+            _buildMsgAndOptionsMemory(sethParam, amountReceivedLD, _sendParam.extraOptions);
         MessagingFee memory sethFee = _quote(_sendParam.dstEid, message, options, false);
 
         msgReceipt = _lzSend(_sendParam.dstEid, message, options, sethFee, _refundAddress);
@@ -295,9 +306,11 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
      */
     function lzCompose(
         address _from,
-        bytes32 /* _guid */,
+        bytes32,
+        /* _guid */
         bytes calldata _message,
-        address /* _executor */,
+        address,
+        /* _executor */
         bytes calldata /* _extraData */
     ) external payable override nonReentrant {
         if (msg.sender != address(endpoint)) revert InvalidComposeSender();
@@ -328,7 +341,10 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
     /**
      * @notice Relays collateral and processes SETH mint if SETH message has already arrived
      */
-    function _processPendingMint(uint32 _srcEid, uint256 _transferId) internal {
+    function _processPendingMint(
+        uint32 _srcEid,
+        uint256 _transferId
+    ) internal {
         PendingMint memory pm = pendingMints[_srcEid][_transferId];
         if (pm.to == address(0)) return;
 
@@ -343,7 +359,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         delete ethQueue[_srcEid][_transferId];
         delete pendingMints[_srcEid][_transferId];
 
-        ISETH(SETH).mint{value: ethAmount}(pm.to, amountToMint);
+        ISETH(SETH).mint{ value: ethAmount }(pm.to, amountToMint);
         _inflow(_srcEid, amountToMint);
     }
 
@@ -359,7 +375,8 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         Origin calldata _origin,
         bytes32 _guid,
         bytes calldata _message,
-        address /* _executor */,
+        address,
+        /* _executor */
         bytes calldata /* _extraData */
     ) internal virtual override nonReentrant {
         if (!OFTMsgCodec.isComposed(_message)) revert InvalidComposeSender();
@@ -398,7 +415,7 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
         if (queuedEthAmount > 0) {
             if (queuedEthAmount != ethAmount) revert InvalidAmount();
             delete ethQueue[srcEid][transferId];
-            ISETH(SETH).mint{value: ethAmount}(_to, amountToMint);
+            ISETH(SETH).mint{ value: ethAmount }(_to, amountToMint);
             _inflow(srcEid, amountToMint);
         } else {
             if (pendingMints[srcEid][transferId].to != address(0)) revert InvalidAmount();
@@ -448,7 +465,9 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
     }
 
     /// @notice Convert address to bytes32 for LayerZero data object
-    function _addressToBytes32(address _addr) internal pure returns (bytes32) {
+    function _addressToBytes32(
+        address _addr
+    ) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(_addr)));
     }
 
@@ -473,12 +492,16 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
 
     /// @notice Set rate limits per destination chain
     /// @dev Must be configured for each dstEid before sends are allowed. Use conservative limits initially.
-    function setRateLimits(RateLimiter.RateLimitConfig[] calldata _rateLimitConfigs) external onlyOwner {
+    function setRateLimits(
+        RateLimiter.RateLimitConfig[] calldata _rateLimitConfigs
+    ) external onlyOwner {
         _setRateLimits(_rateLimitConfigs);
     }
 
     /// @notice Reset rate limit in-flight amounts for given chains
-    function resetRateLimits(uint32[] calldata _eids) external onlyOwner {
+    function resetRateLimits(
+        uint32[] calldata _eids
+    ) external onlyOwner {
         _resetRateLimits(_eids);
     }
 
@@ -494,7 +517,9 @@ contract SETHAdapter is MintBurnOFTAdapter, RateLimiter, Pausable, ReentrancyGua
     }
 
     /// @notice Set minimum transfer amount
-    function setMinTransferAmount(uint256 _min) external onlyOwner {
+    function setMinTransferAmount(
+        uint256 _min
+    ) external onlyOwner {
         uint256 oldMin = minTransferAmountLD;
         minTransferAmountLD = _min;
         emit MinTransferAmountSet(oldMin, _min);
