@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.34;
 
 /**
@@ -68,17 +68,17 @@ abstract contract DynamicFee {
     //  Dynamic Fee Constants
     // ------------------------------------------
 
-    uint256 internal constant FEE_MIN_BPS = 100; // should be 060 for 0.60%
+    uint256 internal constant FEE_MIN_BPS = 60;
 
-    uint256 internal constant FEE_START_TIER_1 = 500; // should be 200 for 2.00%
-    uint256 internal constant FEE_START_TIER_2 = 481; // need to calculate
-    uint256 internal constant FEE_START_TIER_3 = 322; // need to calculate
-    uint256 internal constant FEE_START_TIER_4 = 123; // need to calculate
+    uint256 internal constant FEE_START_TIER_1 = 200;
+    uint256 internal constant FEE_START_TIER_2 = 136;
+    uint256 internal constant FEE_START_TIER_3 = 90;
+    uint256 internal constant FEE_START_TIER_4 = 60;
 
-    uint256 internal constant ALPHA_TIER_1 = 100; // can potentially stay - test
-    uint256 internal constant ALPHA_TIER_2 = 120; // can potentially stay - test
-    uint256 internal constant ALPHA_TIER_3 = 50; // can potentially stay - test
-    uint256 internal constant ALPHA_TIER_4 = 100; // can potentially stay - test
+    uint256 internal constant ALPHA_TIER_1 = 300; // double-check decay factor against FEE_START; might be different due to denominator being USD
+    uint256 internal constant ALPHA_TIER_2 = 50;
+    uint256 internal constant ALPHA_TIER_3 = 100;
+    uint256 internal constant ALPHA_TIER_4 = 300;
 
     uint256 internal constant TIER_1_THRESHOLD_USD = 0;
     uint256 internal constant TIER_2_THRESHOLD_USD = 25_000;
