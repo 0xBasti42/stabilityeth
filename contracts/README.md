@@ -4,23 +4,23 @@
   <img src="../banner.png" alt="StabilityETH by Isla Labs" width="100%">
 </p>
 
-# SETH ♢
+# sETH ♢
 
-StabilityETH (SETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
+StabilityETH (sETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
 
 ## Key Features
 
-- **1:100 Minting Ratio** — SETH can be minted at a 1:100 ratio to native ETH on any supported chain.
+- **1:100 Minting Ratio** — sETH can be minted at a 1:100 ratio to native ETH on any supported chain.
 
 - **Performance Based Returns (PBR)** — Verified applications generate yield proportionally to their relative TVL.
 
-- **Omnichain Asset** — SETH maintains its 1:100 collateralization rate across all chains during cross-chain transfers.
+- **Omnichain Asset** — sETH maintains its 1:100 collateralization rate across all chains during cross-chain transfers.
 
 - **Open Eligibility** — All dApps are eligible for PBR if they meet the eligibility criteria.
 
 ## How It Works
 
-SETH is fully collateralized by ETH at a 100:1 ratio (1 SETH = 0.01 ETH). Cross-chain transfers preserve this collateralization regardless of message arrival order. Verified applications receive Performance Based Returns in proportion to their share of total TVL, which does not rely on SETH holdings and instead can include any token staked in any contract, as long as the token has a market cap above $100m and the contract has a TVL above $100k.
+sETH is fully collateralized by ETH at a 100:1 ratio (1 sETH = 0.01 ETH). Cross-chain transfers preserve this collateralization regardless of message arrival order. Verified applications receive Performance Based Returns in proportion to their share of total TVL, which does not rely on sETH holdings and instead can include any token staked in any contract, as long as the token has a market cap above $100m and the contract has a TVL above $100k.
 
 ## Security
 
