@@ -1,12 +1,12 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-black.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html) [![solidity](https://img.shields.io/badge/solidity-%5E0.8.34-black)](https://docs.soliditylang.org/en/v0.8.34/) [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-000000.svg)](https://getfoundry.sh/)
 
 <p align="center">
-  <img src="./banner.png" alt="StabilityETH by Isla Labs" width="100%">
+  <img src="./banner.png" alt="stabilityETH by Isla Labs" width="100%">
 </p>
 
 # sETH ♢
 
-StabilityETH (sETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
+stabilityETH (sETH) is an independent project inspired by Wrapped ETH, with a key difference: it turns TVL into an additional source of revenue for verified applications on both EVM and non-EVM chains.
 
 ## Key Features
 
