@@ -36,7 +36,6 @@
     .swap-header {
         width: 100%;
         height: 60px;
-        background-color: var(--color-tertiary);
         border-bottom: 1px solid var(--color-border);
         border-radius: var(--border-radius) var(--border-radius) 0 0;
     }
@@ -44,7 +43,6 @@
     .swap-body {
         width: 100%;
         height: 100%;
-        background-color: #222222;
         border-bottom: 1px solid var(--color-border);
         display: flex;
         flex-direction: column;
@@ -66,7 +64,6 @@
     .swap-footer {
         width: 100%;
         height: 100px;
-        background-color: var(--color-tertiary);
         border-radius: 0 0 var(--border-radius) var(--border-radius);
     }
 </style>
