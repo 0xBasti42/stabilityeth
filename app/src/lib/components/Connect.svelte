@@ -25,7 +25,7 @@
     onclick={toggleConnection}
     style="font-size: 10px; border: 1px solid #999999;"
 >
-    {$connected ? '♢ 1.42' : 'Sign In'}
+    {$connected ? '♢ 1.42' : 'Connect'}
 </button>
 
 <style>

@@ -1,0 +1,42 @@
+Each Spoke Chain (EVM):
+├── SETH.sol (OFT with 0.5% fee-on-transfer)
+│   └── Fees sent to local FeeVault
+├── Vault.sol (holds ETH/WETH collateral)
+│   └── No fees here anymore (0% mint/burn)
+│   └── Potentially relays ETH/WETH collateral to mainnet
+│   └── Interactions limited to SETH contract
+└── FeeVault.sol (accumulates SETH fees)
+    └── sweepFees() → burn SETH for native token → Wormhole(?) to mainnet
+    └── Interactions limited to SETH contract & Chainlink Automation
+
+Solana:
+├── SETH (SPL Token via LayerZero OFT)
+│   └── Fees sent to local FeeVault PDA
+├── Vault.sol (holds ETH/WETH collateral)
+│   └── No fees here anymore (0% mint/burn)
+│   └── Potentially relays ETH/WETH collateral to mainnet
+│   └── Interactions limited to SETH contract
+└── FeeVault (accumulates SETH fees)
+    └── sweepFees() → burn SETH for ETH (Portal) → Wormhole to mainnet
+    └── Interactions limited to SETH contract & Chainlink Automation
+
+Mainnet:
+├── SETH.sol (OFT - canonical)
+│   └── Burn SETH for ETH → split fees & transfer
+├── Vault.sol (holds ETH/WETH collateral)
+│   └── No fees here anymore (0% mint/burn)
+│   └── Potentially relays ETH/WETH collateral to mainnet
+│   └── Interactions limited to SETH contract
+├── FeeVault.sol (receives swept SETH from all chains)
+│   └── sweepFees() → burn SETH for ETH → send to OVault
+│   └── Interactions limited to SETH contract & Chainlink Automation
+├── OVault.sol
+│   └── Stores scalar balances & enables PBR claims
+│   └── Enables multichain claims from a single liquidity source
+│   └── No staking required. OVault calls 
+├── AppRegistry.sol
+│   └── Tracks TVL shares
+│   └── Enables automated registration process
+└── PBRManager.sol
+    └── Collects tokenPrices[] and contractLiq[] using Chainlink Functions
+    └── Calculates TVL proportions and distributes PBR as claimable scalars
